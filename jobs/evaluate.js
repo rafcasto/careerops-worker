@@ -9,6 +9,7 @@ import { ensureUserRoot, nextReportNumber, slug } from '../lib/user-root.js';
 import { DEFAULT_AGENTS_CONFIG, buildEvaluatorMessages, buildSummaryMessages, parseScoreSummary, collapseRepeats } from '../lib/prompts.js';
 import { runAgent } from '../lib/llm.js';
 import { extractJd } from '../lib/extract.js';
+import { setPipelineStatus } from '../lib/firestore.js';
 
 export async function run({ job, env, log, progress, cancelled }) {
   const { uid, payload } = job;
@@ -74,7 +75,7 @@ export async function run({ job, env, log, progress, cancelled }) {
 ${s.body}
 `;
   await writeFile(join(root, 'reports', filename), markdown, 'utf8');
-  if (url) await writeFile(join(root, 'jds', `${num}-${slug(s.company)}.txt`), jd, 'utf8');
+  await writeFile(join(root, 'jds', `${num}-${slug(s.company)}.txt`), jd, 'utf8');
   await log(`report saved: reports/${filename}`);
 
   const report = {
@@ -82,8 +83,10 @@ ${s.body}
     score: s.score, archetype: s.archetype, legitimacy: s.legitimacy, summaryFound: s.found,
     markdown, agent: 'evaluator', model: cfg.model, promptVersion: cfg.promptVersion, via: out.via,
     usage: out.usage, doneReason: out.doneReason ?? null, viaSummaryPass: !!s.viaSummaryPass, durationMs: out.durationMs, jdChars: jd.length,
+    jd: jd.slice(0, 20000), pipelineId: typeof payload.pipelineId === 'string' ? payload.pipelineId : null,
   };
   await saveReport(uid, job.id, report);
+  if (report.pipelineId) await setPipelineStatus(uid, report.pipelineId, { status: 'evaluated', reportJobId: job.id, score: s.score });
   await progress(`done — ${s.company} · ${s.score ?? '?'}/5`);
   return { company: s.company, role: s.role, score: s.score, archetype: s.archetype, legitimacy: s.legitimacy, file: filename, via: out.via, durationMs: out.durationMs };
 }

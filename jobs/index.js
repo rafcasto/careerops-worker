@@ -3,12 +3,15 @@ const notYet = (type) => async ({ log }) => { log(`${type}: not implemented yet 
 
 import { run as evaluate } from './evaluate.js';
 import { run as syncSetup } from './sync_setup.js';
+import { run as pdf } from './pdf.js';
+import { run as cover } from './cover.js';
+import { run as scan } from './scan.js';
 
 export const HANDLERS = {
   evaluate,
-  scan: notYet('scan'),
-  pdf: notYet('pdf'),
-  cover: notYet('cover'),
+  scan,
+  pdf,
+  cover,
   sync_setup: syncSetup,
   import_model: notYet('import_model'),
   build_dataset: notYet('build_dataset'),

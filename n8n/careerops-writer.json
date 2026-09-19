@@ -1,14 +1,14 @@
 {
-  "name": "careerops/evaluator",
+  "name": "careerops/writer",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "careerops/evaluator",
+        "path": "careerops/writer",
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "a1b2c3d4-0000-4000-8000-000000000001",
+      "id": "a1b2c3d4-writ-4000-8000-000000000001",
       "name": "Webhook (from careerops-worker)",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
@@ -16,13 +16,13 @@
         0,
         0
       ],
-      "webhookId": "careerops-evaluator"
+      "webhookId": "careerops-writer"
     },
     {
       "parameters": {
         "jsCode": "// The worker sends { agent, model, options, messages, format? }. This node is the place to\n// add tools, memory or extra context later \u2014 for now it passes the turn through.\nconst b = $input.first().json.body ?? $input.first().json;\nreturn [{ json: { model: b.model, options: b.options ?? {}, messages: b.messages, stream: false, ...(b.format ? { format: b.format } : {}) } }];"
       },
-      "id": "a1b2c3d4-0000-4000-8000-000000000002",
+      "id": "a1b2c3d4-writ-4000-8000-000000000002",
       "name": "Build Ollama request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -42,7 +42,7 @@
           "timeout": 3600000
         }
       },
-      "id": "a1b2c3d4-0000-4000-8000-000000000003",
+      "id": "a1b2c3d4-writ-4000-8000-000000000003",
       "name": "Ollama chat",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -57,7 +57,7 @@
         "responseBody": "={{ JSON.stringify({ content: $json.message.content, model: $json.model, done_reason: $json.done_reason, usage: { prompt: $json.prompt_eval_count, completion: $json.eval_count }, via: 'n8n' }) }}",
         "options": {}
       },
-      "id": "a1b2c3d4-0000-4000-8000-000000000004",
+      "id": "a1b2c3d4-writ-4000-8000-000000000004",
       "name": "Respond to worker",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -107,5 +107,5 @@
     "executionTimeout": 3600
   },
   "active": false,
-  "id": "CareerOpsEvalu01"
+  "id": "CareerOpsWrite01"
 }

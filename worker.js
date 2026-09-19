@@ -15,6 +15,7 @@ import { ollamaModels, n8nUp, n8nAgentWorkflows, gpuReachable, careerOpsVersion 
 import { HANDLERS } from './jobs/index.js';
 import { getAgentsConfig, publishAgentDefaults } from './lib/firestore.js';
 import { DEFAULT_AGENTS_CONFIG } from './lib/prompts.js';
+import { driveConfigured, driveAccountEmail, probeFolder } from './lib/drive.js';
 
 const VERSION = '0.1.0';
 for (const v of ['UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN']) if (!process.env[v]) { console.error(`Missing ${v}`); process.exit(2); }
@@ -48,13 +49,15 @@ async function heartbeat() {
 }
 
 async function publishState() {
-  const [models, n8nOk, agents, gpu, version] = await Promise.all([
+  const [models, n8nOk, agents, gpu, version, drive] = await Promise.all([
     ollamaModels(env.ollama), n8nUp(env.n8n), n8nAgentWorkflows(AGENT_KEYS), gpuReachable(env.gpuHost), careerOpsVersion(env.repo),
+    driveConfigured() ? probeFolder(process.env.GOOGLE_DRIVE_FOLDER_ID) : Promise.resolve(null),
   ]);
   probes = { n8n: n8nOk, ollama: models !== null };
   const state = {
     models: models ?? [], agents, datasets: [],
     gpu: { host: env.gpuHost, reachable: gpu, checkedAt: now() },
+    drive: { configured: driveConfigured(), account: driveAccountEmail(), folderId: process.env.GOOGLE_DRIVE_FOLDER_ID ?? null, ...(drive ?? {}) },
     careerOpsVersion: version, updatedAt: now(),
   };
   try { await redis.set(KEYS.state, JSON.stringify(state)); } catch (e) { say('state publish failed', e.message); }
