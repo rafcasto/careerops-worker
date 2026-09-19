@@ -56,8 +56,17 @@ export async function run({ job, env, log, progress, cancelled }) {
     await progress(`training ${base} on ${ds.train} examples × ${epochs} epochs (accum ${accum})`);
     // Detached: a laptop GPU box drops SSH sessions (sleep, Wi-Fi). Training runs under nohup
     // and writes .exit when done; we poll and tolerate connection blips in between.
-    const trainCmd = `cd ${remote} && rm -f .exit && PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True UNSLOTH_CE_LOSS_TARGET_GB=1 nohup ~/careerops-finetune/venv/bin/python3 train_lora.py --base '${base}' --data train.jsonl --out ${outName} --epochs ${epochs} --max_seq ${maxSeq} --batch 1 --accum ${accum} > train.log 2>&1; echo \\$? > .exit`;
-    await ssh(`nohup bash -c ${JSON.stringify(trainCmd)} > /dev/null 2>&1 & echo started`);
+    // Ship the training script as a file (base64, no shell-quoting games) so the exit
+    // code written to .exit is the trainer's, not something the login shell expanded.
+    const trainScript = `#!/bin/bash
+cd ${remote}
+rm -f .exit
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True UNSLOTH_CE_LOSS_TARGET_GB=1
+~/careerops-finetune/venv/bin/python3 train_lora.py --base '${base}' --data train.jsonl --out ${outName} --epochs ${epochs} --max_seq ${maxSeq} --batch 1 --accum ${accum} > train.log 2>&1
+echo $? > .exit
+`;
+    const b64 = Buffer.from(trainScript).toString('base64');
+    await ssh(`echo ${b64} | base64 -d > ${remote}/train.sh && chmod +x ${remote}/train.sh && (nohup ${remote}/train.sh > /dev/null 2>&1 &) && echo started`);
     const t0 = Date.now();
     let lastTail = '', misses = 0;
     for (;;) {
