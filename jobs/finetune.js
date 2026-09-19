@@ -49,7 +49,9 @@ export async function run({ job, env, log, progress, cancelled }) {
     await sh('rsync', ['-az', join(ds.dir, 'train.jsonl'), `${host}:${remote}/train.jsonl`], { log });
 
     await progress('python env (first run installs unsloth — slow)');
-    await ssh(`[ -x ~/careerops-finetune/venv/bin/python3 ] || python3 -m venv ~/careerops-finetune/venv; ~/careerops-finetune/venv/bin/python3 -c 'import torch, unsloth, trl, datasets' 2>/dev/null || { ~/careerops-finetune/venv/bin/pip install -q --upgrade pip && ~/careerops-finetune/venv/bin/pip install -q torch --index-url https://download.pytorch.org/whl/cu128 && ~/careerops-finetune/venv/bin/pip install -q 'unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git' trl datasets; }`);
+    // torch/unsloth ship wheels for CPython ≤ 3.12: prefer python3.12 / 3.11 when creating the venv,
+    // and let pip resume the ~800 MB torch download instead of failing on a flaky link.
+    await ssh(`V=~/careerops-finetune/venv; [ -x $V/bin/python3 ] || { PY=$(command -v python3.12 || command -v python3.11 || command -v python3); echo "creating venv with $PY ($($PY --version))"; $PY -m venv $V; }; $V/bin/python3 -c 'import torch, unsloth, trl, datasets' 2>/dev/null || { $V/bin/pip install -q --upgrade pip && $V/bin/pip install -q --resume-retries 10 torch --index-url https://download.pytorch.org/whl/cu128 && $V/bin/pip install -q --resume-retries 10 'unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git' trl datasets; }`);
 
     await progress(`training ${base} on ${ds.train} examples × ${epochs} epochs (accum ${accum})`);
     await ssh(`cd ${remote} && PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True UNSLOTH_CE_LOSS_TARGET_GB=1 ~/careerops-finetune/venv/bin/python3 train_lora.py --base '${base}' --data train.jsonl --out ${outName} --epochs ${epochs} --max_seq ${maxSeq} --batch 1 --accum ${accum}`);
