@@ -7,7 +7,6 @@
 // port on the Pi), runs one job at a time through n8n/Ollama/career-ops scripts,
 // and publishes a heartbeat (careerops:worker) + a state snapshot (careerops:state:
 // Ollama models, n8n agent workflows, GPU reachability) the admin tab reads.
-// Same shape as credit-assessment-agent/console/worker.js (Terepay).
 
 import os from 'node:os';
 import { Redis } from '@upstash/redis';
@@ -28,7 +27,10 @@ const env = {
   gpuHost: process.env.GPU_SSH_HOST || null,
   pollMs: Math.max(1000, Number(process.env.POLL_MS) || 3000),
 };
-const WORKER_ID = process.env.WORKER_ID || `${os.hostname()}-${process.pid}`;
+// How this worker introduces itself in the admin tab. The Pi's OS hostname is
+// shared with other services, so both are overridable from .env.
+const WORKER_HOST = process.env.WORKER_HOST || os.hostname();
+const WORKER_ID = process.env.WORKER_ID || `careerops-${WORKER_HOST}-${process.pid}`;
 const redis = new Redis({ url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN });
 const now = () => Date.now();
 const say = (...a) => console.log(new Date().toISOString(), ...a);
@@ -39,7 +41,7 @@ const startedAt = now();
 
 // ---------------- heartbeat + state ----------------
 async function heartbeat() {
-  const hb = { id: WORKER_ID, host: os.hostname(), pid: process.pid, version: VERSION, startedAt, at: now(), current, pollMs: env.pollMs, n8n: probes.n8n, ollama: probes.ollama };
+  const hb = { id: WORKER_ID, host: WORKER_HOST, pid: process.pid, version: VERSION, startedAt, at: now(), current, pollMs: env.pollMs, n8n: probes.n8n, ollama: probes.ollama };
   try { await redis.set(KEYS.worker, JSON.stringify(hb), { ex: HEARTBEAT_TTL_S }); } catch (e) { say('heartbeat failed', e.message); }
 }
 
