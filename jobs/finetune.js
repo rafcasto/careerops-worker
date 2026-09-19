@@ -54,7 +54,25 @@ export async function run({ job, env, log, progress, cancelled }) {
     await ssh(`V=~/careerops-finetune/venv; [ -x $V/bin/python3 ] || { PY=$(command -v python3.12 || command -v python3.11 || command -v python3); echo "creating venv with $PY ($($PY --version))"; $PY -m venv $V; }; $V/bin/python3 -c 'import torch, unsloth, trl, datasets' 2>/dev/null || { $V/bin/pip install -q --upgrade pip && $V/bin/pip install -q --resume-retries 10 torch --index-url https://download.pytorch.org/whl/cu128 && $V/bin/pip install -q --resume-retries 10 'unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git' trl datasets; }`);
 
     await progress(`training ${base} on ${ds.train} examples × ${epochs} epochs (accum ${accum})`);
-    await ssh(`cd ${remote} && PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True UNSLOTH_CE_LOSS_TARGET_GB=1 ~/careerops-finetune/venv/bin/python3 train_lora.py --base '${base}' --data train.jsonl --out ${outName} --epochs ${epochs} --max_seq ${maxSeq} --batch 1 --accum ${accum}`);
+    // Detached: a laptop GPU box drops SSH sessions (sleep, Wi-Fi). Training runs under nohup
+    // and writes .exit when done; we poll and tolerate connection blips in between.
+    const trainCmd = `cd ${remote} && rm -f .exit && PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True UNSLOTH_CE_LOSS_TARGET_GB=1 nohup ~/careerops-finetune/venv/bin/python3 train_lora.py --base '${base}' --data train.jsonl --out ${outName} --epochs ${epochs} --max_seq ${maxSeq} --batch 1 --accum ${accum} > train.log 2>&1; echo $? > .exit`;
+    await ssh(`nohup bash -c ${JSON.stringify(trainCmd)} > /dev/null 2>&1 & echo started`);
+    const t0 = Date.now();
+    let lastTail = '', misses = 0;
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 30000));
+      if (await cancelled()) { await ssh(`pkill -f 'train_lora.py --base' || true`).catch(() => {}); throw new Error('cancelled'); }
+      if (Date.now() - t0 > 4 * 3600 * 1000) throw new Error('training exceeded 4 hours');
+      let out;
+      try { out = await sh('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', host, `cd ${remote} && (cat .exit 2>/dev/null || echo running) && tail -c 1500 train.log 2>/dev/null | tr '\\r' '\\n' | grep -v '^$' | tail -4`]); misses = 0; }
+      catch (e) { misses++; await log(`GPU box unreachable (${misses}/20): ${e.message.split('\n')[0].slice(0, 120)}`); if (misses >= 20) throw new Error('GPU box unreachable for 10 minutes — is it asleep? Training may still be running there; re-run to resume once it is back'); continue; }
+      const [first, ...rest] = out.trim().split('\n');
+      const tail = rest.join('\n');
+      if (tail && tail !== lastTail) { lastTail = tail; await log(tail); }
+      if (first !== 'running') { if (first.trim() !== '0') throw new Error(`training exited ${first.trim()}: ${tail.split('\n').slice(-3).join(' · ')}`); break; }
+      await progress(`training… ${Math.round((Date.now() - t0) / 60000)} min`);
+    }
 
     await progress('fetching the GGUF');
     const local = join(env.trainingDir, 'models', outName);
