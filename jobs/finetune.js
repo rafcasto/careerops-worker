@@ -31,6 +31,8 @@ export async function run({ job, env, log, progress, cancelled }) {
   const tag = safeTag(payload.tag || `careerops-evaluator:${new Date().toISOString().slice(0, 10)}`);
   const epochs = Math.min(5, Math.max(0.5, Number(payload.epochs) || 2));
   const maxSeq = Math.min(8192, Math.max(2048, Math.round(Number(payload.maxSeq) || 6144)));
+  // Effective batch = batch × accum; scale accumulation to the dataset so tiny pilots still take real steps.
+  const accum = Math.max(1, Math.min(16, Math.floor((ds.train ?? 16) / 4)));
   const outName = tag.replace(/[:/]/g, '-');
   const remote = `~/careerops-finetune/${outName}`;
   const ssh = (cmd) => sh('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', host, cmd], { log, cancelled });
@@ -49,8 +51,8 @@ export async function run({ job, env, log, progress, cancelled }) {
     await progress('python env (first run installs unsloth — slow)');
     await ssh(`[ -x ~/careerops-finetune/venv/bin/python3 ] || python3 -m venv ~/careerops-finetune/venv; ~/careerops-finetune/venv/bin/python3 -c 'import torch, unsloth, trl, datasets' 2>/dev/null || { ~/careerops-finetune/venv/bin/pip install -q --upgrade pip && ~/careerops-finetune/venv/bin/pip install -q torch --index-url https://download.pytorch.org/whl/cu128 && ~/careerops-finetune/venv/bin/pip install -q 'unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git' trl datasets; }`);
 
-    await progress(`training ${base} on ${ds.train} examples × ${epochs} epochs`);
-    await ssh(`cd ${remote} && PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True UNSLOTH_CE_LOSS_TARGET_GB=1 ~/careerops-finetune/venv/bin/python3 train_lora.py --base '${base}' --data train.jsonl --out ${outName} --epochs ${epochs} --max_seq ${maxSeq}`);
+    await progress(`training ${base} on ${ds.train} examples × ${epochs} epochs (accum ${accum})`);
+    await ssh(`cd ${remote} && PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True UNSLOTH_CE_LOSS_TARGET_GB=1 ~/careerops-finetune/venv/bin/python3 train_lora.py --base '${base}' --data train.jsonl --out ${outName} --epochs ${epochs} --max_seq ${maxSeq} --batch 1 --accum ${accum}`);
 
     await progress('fetching the GGUF');
     const local = join(env.trainingDir, 'models', outName);
