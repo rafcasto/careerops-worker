@@ -1,13 +1,15 @@
 // One module per job type. Each exports async run(ctx) where ctx = { job, log, progress, cancelled, env, ... }.
-// Phase 0 ships only the contract; phase 1 adds evaluate + sync_setup.
 const notYet = (type) => async ({ log }) => { log(`${type}: not implemented yet (see docs/CAREER_OPS_AGENTS.md phases)`); throw new Error(`${type} is not available yet`); };
 
+import { run as evaluate } from './evaluate.js';
+import { run as syncSetup } from './sync_setup.js';
+
 export const HANDLERS = {
-  evaluate: notYet('evaluate'),
+  evaluate,
   scan: notYet('scan'),
   pdf: notYet('pdf'),
   cover: notYet('cover'),
-  sync_setup: notYet('sync_setup'),
+  sync_setup: syncSetup,
   import_model: notYet('import_model'),
   build_dataset: notYet('build_dataset'),
   generate_gold: notYet('generate_gold'),

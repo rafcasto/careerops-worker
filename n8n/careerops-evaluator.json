@@ -1,0 +1,111 @@
+{
+  "name": "careerops/evaluator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "careerops/evaluator",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0000-4000-8000-000000000001",
+      "name": "Webhook (from careerops-worker)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "careerops-evaluator"
+    },
+    {
+      "parameters": {
+        "jsCode": "// The worker sends { agent, model, options, messages }. This node is the place to\n// add tools, memory or extra context later \u2014 for now it passes the turn through.\nconst b = $input.first().json.body ?? $input.first().json;\nreturn [{ json: { model: b.model, options: b.options ?? {}, messages: b.messages, stream: false } }];"
+      },
+      "id": "a1b2c3d4-0000-4000-8000-000000000002",
+      "name": "Build Ollama request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:11434/api/chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 3600000
+        }
+      },
+      "id": "a1b2c3d4-0000-4000-8000-000000000003",
+      "name": "Ollama chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ content: $json.message.content, model: $json.model, done_reason: $json.done_reason, usage: { prompt: $json.prompt_eval_count, completion: $json.eval_count }, via: 'n8n' }) }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0000-4000-8000-000000000004",
+      "name": "Respond to worker",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        780,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook (from careerops-worker)": {
+      "main": [
+        [
+          {
+            "node": "Build Ollama request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Ollama request": {
+      "main": [
+        [
+          {
+            "node": "Ollama chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama chat": {
+      "main": [
+        [
+          {
+            "node": "Respond to worker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": 3600
+  },
+  "active": false,
+  "id": "CareerOpsEvalu01"
+}

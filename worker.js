@@ -13,6 +13,8 @@ import { Redis } from '@upstash/redis';
 import { KEYS, AGENT_KEYS, HEARTBEAT_TTL_S, LOG_TAIL_BYTES } from './lib/keys.js';
 import { ollamaModels, n8nUp, n8nAgentWorkflows, gpuReachable, careerOpsVersion } from './lib/probes.js';
 import { HANDLERS } from './jobs/index.js';
+import { getAgentsConfig } from './lib/firestore.js';
+import { DEFAULT_AGENTS_CONFIG } from './lib/prompts.js';
 
 const VERSION = '0.1.0';
 for (const v of ['UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN']) if (!process.env[v]) { console.error(`Missing ${v}`); process.exit(2); }
@@ -92,6 +94,7 @@ async function runJob(id) {
 // ---------------- main loop ----------------
 async function main() {
   say(`careerops-worker v${VERSION} as ${WORKER_ID} · repo ${env.repo} · data ${env.dataBase}`);
+  try { await getAgentsConfig(DEFAULT_AGENTS_CONFIG); say('config/agents ready'); } catch (e) { say('config/agents unavailable:', e.message); }
   await publishState(); await heartbeat();
   let lastBeat = now(), lastState = now();
   for (;;) {
