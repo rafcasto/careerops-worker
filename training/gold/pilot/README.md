@@ -25,7 +25,8 @@ Import: `node scripts/import-gold.mjs training/gold/pilot` → `trainingExamples
 
 | Model | Score MAE | ±0.5 | Summary block | s/case | Notes |
 |---|---|---|---|---|---|
-| `llama3.2:3b` (stock) | 0.45 | 50% | 100% | 223 | answered 3.4 for both cases |
+| `llama3.2:3b` (stock), run 1 | 0.45 | 50% | 100% | 223 | answered 3.4 for both cases |
+| `llama3.2:3b` (stock), run 2 | 0.20 | 100% (n=1) | 50% | 203 | Lightspeed 3.4 / "Other: Technical AI PM" / High Confidence; no block on Datacom — run-to-run variance is large at n=2 |
 | `qwen2.5:1.5b-instruct` (stock) | 0.40 | 100% (n=1) | 50% | 139 | |
 | `careerops-evaluator:pilot1-1.5b` (LoRA, 3 epochs, 15 steps, loss 2.14) | 1.10 | 0% (n=1) | 50% | 153 | 4.7 vs gold 3.6; lost the block on Datacom |
 | `careerops-evaluator:pilot1-3b` | — | — | — | — | training fails on the RTX 3060 Laptop (6 GB): `CUDA driver error: device not ready` in backward, 3/3 attempts (1.5B trains fine) |
