@@ -56,7 +56,7 @@ export async function run({ job, env, log, progress, cancelled }) {
     await progress(`training ${base} on ${ds.train} examples × ${epochs} epochs (accum ${accum})`);
     // Detached: a laptop GPU box drops SSH sessions (sleep, Wi-Fi). Training runs under nohup
     // and writes .exit when done; we poll and tolerate connection blips in between.
-    const trainCmd = `cd ${remote} && rm -f .exit && PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True UNSLOTH_CE_LOSS_TARGET_GB=1 nohup ~/careerops-finetune/venv/bin/python3 train_lora.py --base '${base}' --data train.jsonl --out ${outName} --epochs ${epochs} --max_seq ${maxSeq} --batch 1 --accum ${accum} > train.log 2>&1; echo $? > .exit`;
+    const trainCmd = `cd ${remote} && rm -f .exit && PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True UNSLOTH_CE_LOSS_TARGET_GB=1 nohup ~/careerops-finetune/venv/bin/python3 train_lora.py --base '${base}' --data train.jsonl --out ${outName} --epochs ${epochs} --max_seq ${maxSeq} --batch 1 --accum ${accum} > train.log 2>&1; echo \\$? > .exit`;
     await ssh(`nohup bash -c ${JSON.stringify(trainCmd)} > /dev/null 2>&1 & echo started`);
     const t0 = Date.now();
     let lastTail = '', misses = 0;
@@ -74,12 +74,23 @@ export async function run({ job, env, log, progress, cancelled }) {
       await progress(`training… ${Math.round((Date.now() - t0) / 60000)} min`);
     }
 
-    await progress('fetching the GGUF');
+    await progress('fetching the GGUF (resumable)');
     const local = join(env.trainingDir, 'models', outName);
     await mkdir(local, { recursive: true });
-    await sh('rsync', ['-az', `${host}:${remote}/${outName}/`, `${local}/`, '--include=*.gguf', '--include=Modelfile', '--exclude=*'], { log });
+    // ~1 GB over a laptop Wi-Fi link: resume on every drop instead of starting over.
+    let fetched = false;
+    for (let attempt = 1; attempt <= 40 && !fetched; attempt++) {
+      if (await cancelled()) throw new Error('cancelled');
+      try {
+        await sh('rsync', ['-az', '--partial', '--append-verify', '--timeout=60', '-e', 'ssh -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=10 -o ServerAliveCountMax=3', `${host}:${remote}/${outName}/`, `${local}/`, '--include=*.gguf', '--include=Modelfile', '--exclude=*'], { log });
+        fetched = true;
+      } catch (e) { await log(`fetch attempt ${attempt} failed (${e.message.split('\n')[0].slice(0, 100)}) — retrying in 15s`); await new Promise((r) => setTimeout(r, 15000)); }
+    }
+    if (!fetched) throw new Error('could not fetch the GGUF from the GPU box after 40 attempts');
     const gguf = (await readdir(local)).find((f) => f.endsWith('.gguf'));
     if (!gguf) throw new Error('no GGUF came back from the GPU box');
+    // Our own Modelfile: no TEMPLATE override, so Ollama uses the chat template from the GGUF.
+    await writeFile(join(local, 'Modelfile'), `FROM ./${gguf}\nPARAMETER temperature 0.2\nPARAMETER num_ctx 8192\nPARAMETER repeat_penalty 1.15\n`, 'utf8');
 
     await progress(`importing into Ollama as ${tag}`);
     await sh('ollama', ['create', tag, '-f', join(local, 'Modelfile')], { cwd: local, log });

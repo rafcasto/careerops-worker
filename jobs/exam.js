@@ -34,7 +34,7 @@ export async function run({ job, env, log, progress, cancelled }) {
     const c = {
       id: ex.id, company: ex.company, role: ex.role, seconds: Math.round((Date.now() - c0) / 1000),
       gold: { score: gold.score, archetype: gold.archetype, legitimacy: gold.legitimacy },
-      got: { score: s.score, archetype: s.archetype, legitimacy: s.legitimacy, summaryFound: s.found },
+      got: { score: s.score, archetype: s.archetype, legitimacy: s.legitimacy, summaryFound: s.found, raw: s.raw },
       scoreDiff: s.score != null && gold.score != null ? Math.round(Math.abs(s.score - gold.score) * 100) / 100 : null,
       archetypeMatch: !!archKey(gold.archetype) && archKey(gold.archetype) === archKey(s.archetype),
       legitimacyMatch: normalizeLegitimacy(gold.legitimacy) === normalizeLegitimacy(s.legitimacy),
