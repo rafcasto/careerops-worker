@@ -1,0 +1,18 @@
+candidate:
+  full_name: "Lucas Ferreira"
+  email: "lucas.ferreira@example.com"
+  location: "Auckland, New Zealand"
+target_roles:
+  primary:
+    - "Product Owner"
+    - "Technical Product Manager"
+compensation:
+  target_range: "NZ$120,000–140,000"
+  minimum: "NZ$110,000"
+location:
+  country: "New Zealand"
+  city: "Auckland"
+  visa_status: "Accredited Employer Work Visa; residency application lodged"
+  needs_sponsorship: false
+  authorized_in:
+    - "New Zealand"

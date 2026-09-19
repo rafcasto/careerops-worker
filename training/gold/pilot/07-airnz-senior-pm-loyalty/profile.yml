@@ -1,0 +1,16 @@
+candidate:
+  full_name: "Aroha Bennett"
+  email: "aroha.bennett@example.com"
+  location: "Auckland, New Zealand"
+target_roles:
+  primary:
+    - "Senior Product Manager"
+    - "Head of Product (loyalty)"
+compensation:
+  target_range: "NZ$165,000–185,000"
+  minimum: "NZ$150,000"
+location:
+  country: "New Zealand"
+  city: "Auckland"
+  authorized_in:
+    - "New Zealand"

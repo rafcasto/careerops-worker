@@ -1,0 +1,16 @@
+candidate:
+  full_name: "Jack O'Sullivan"
+  email: "jack.osullivan@example.com"
+  location: "Wellington, New Zealand"
+target_roles:
+  primary:
+    - "Product Manager"
+    - "Senior Product Manager"
+compensation:
+  target_range: "NZ$140,000–160,000"
+  minimum: "NZ$130,000"
+location:
+  country: "New Zealand"
+  city: "Wellington"
+  authorized_in:
+    - "New Zealand"

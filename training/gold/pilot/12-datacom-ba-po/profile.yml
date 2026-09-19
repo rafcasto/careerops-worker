@@ -1,0 +1,16 @@
+candidate:
+  full_name: "Ben Carter"
+  email: "ben.carter@example.com"
+  location: "Wellington, New Zealand"
+target_roles:
+  primary:
+    - "Product Owner"
+    - "Senior Business Analyst"
+compensation:
+  target_range: "NZ$115,000–130,000"
+  minimum: "NZ$105,000"
+location:
+  country: "New Zealand"
+  city: "Wellington"
+  authorized_in:
+    - "New Zealand"

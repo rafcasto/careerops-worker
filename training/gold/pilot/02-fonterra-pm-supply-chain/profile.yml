@@ -1,0 +1,16 @@
+candidate:
+  full_name: "Tom Ngata"
+  email: "tom.ngata@example.com"
+  location: "Hamilton, New Zealand"
+target_roles:
+  primary:
+    - "Product Manager"
+    - "Product Owner"
+compensation:
+  target_range: "NZ$130,000–150,000"
+  minimum: "NZ$120,000"
+location:
+  country: "New Zealand"
+  city: "Hamilton"
+  authorized_in:
+    - "New Zealand"

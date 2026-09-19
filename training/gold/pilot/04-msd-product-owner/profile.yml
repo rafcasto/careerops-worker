@@ -1,0 +1,16 @@
+candidate:
+  full_name: "Sophie Walsh"
+  email: "sophie.walsh@example.com"
+  location: "Wellington, New Zealand"
+target_roles:
+  primary:
+    - "Product Owner"
+    - "Digital Product Coordinator"
+compensation:
+  target_range: "NZ$85,000–100,000"
+  minimum: "NZ$75,000"
+location:
+  country: "New Zealand"
+  city: "Wellington"
+  authorized_in:
+    - "New Zealand"
