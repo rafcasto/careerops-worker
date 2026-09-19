@@ -16,6 +16,10 @@ import { HANDLERS } from './jobs/index.js';
 import { getAgentsConfig, publishAgentDefaults } from './lib/firestore.js';
 import { DEFAULT_AGENTS_CONFIG } from './lib/prompts.js';
 import { driveConfigured, driveAccountEmail, probeFolder } from './lib/drive.js';
+import { claudeConfigured, TEACHER_MODEL } from './lib/claude.js';
+import { firestore } from './lib/firestore.js';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const VERSION = '0.1.0';
 for (const v of ['UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN']) if (!process.env[v]) { console.error(`Missing ${v}`); process.exit(2); }
@@ -29,6 +33,7 @@ const env = {
   scraper: process.env.JOB_SCRAPER_URL || 'http://127.0.0.1:3010',
   gpuHost: process.env.GPU_SSH_HOST || null,
   pollMs: Math.max(1000, Number(process.env.POLL_MS) || 3000),
+  repoWorker: dirname(fileURLToPath(import.meta.url)),
 };
 // How this worker introduces itself in the admin tab. The Pi's OS hostname is
 // shared with other services, so both are overridable from .env.
@@ -58,9 +63,21 @@ async function publishState() {
     models: models ?? [], agents, datasets: [],
     gpu: { host: env.gpuHost, reachable: gpu, checkedAt: now() },
     drive: { configured: driveConfigured(), account: driveAccountEmail(), folderId: process.env.GOOGLE_DRIVE_FOLDER_ID ?? null, ...(drive ?? {}) },
+    claude: { configured: claudeConfigured(), model: TEACHER_MODEL },
+    training: await trainingSummary(),
     careerOpsVersion: version, updatedAt: now(),
   };
   try { await redis.set(KEYS.state, JSON.stringify(state)); } catch (e) { say('state publish failed', e.message); }
+}
+
+async function trainingSummary() {
+  try {
+    const db = firestore();
+    const [ex, ds] = await Promise.all([db.collection('trainingExamples').select('agent', 'source', 'split', 'approved').get(), db.collection('trainingDatasets').get()]);
+    const examples = { total: ex.size, approved: 0, exam: 0, bySource: {} };
+    for (const d of ex.docs) { const e = d.data(); if (e.approved) examples.approved++; if (e.split === 'exam') examples.exam++; examples.bySource[e.source] = (examples.bySource[e.source] ?? 0) + 1; }
+    return { examples, datasets: ds.docs.map((d) => { const x = d.data(); return { name: x.name, train: x.train, exam: x.exam, builtAt: x.builtAt }; }) };
+  } catch { return null; }
 }
 
 // ---------------- job plumbing ----------------
