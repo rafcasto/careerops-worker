@@ -26,7 +26,7 @@ export async function run({ job, env, log, progress, cancelled }) {
   const setup = await getSetup(uid);
   const root = await ensureUserRoot(env, uid, setup);
   const portals = String(setup?.portalsYaml ?? '').trim();
-  if (!portals) throw new Error('No portals yet — add companies to scan in Agents → Setup');
+  if (!portals) throw new Error('No watchlist yet — add companies in CareerOps → Setup');
   await writeFile(join(root, 'portals.yml'), portals + '\n', 'utf8');
 
   await progress('scanning your portals');

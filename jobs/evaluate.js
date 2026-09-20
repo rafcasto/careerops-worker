@@ -1,5 +1,7 @@
 // evaluate — the Evaluator agent, end to end:
-//   payload { jd?: string, url?: string, model?: string }
+//   payload { jd?: string, url?: string, model?: string, autoPipeline?: boolean }
+//   autoPipeline (Sourcing → pipeline): after the report, log a pending card on the
+//   member's Progress board and, when the score clears 4.0, run the Tailor for the PDF.
 //   → member setup (cv + profile) → JD → n8n/Ollama → A–G report
 //   → reports/NNN-company-date.md in the member's root → Firestore mirror.
 import { writeFile } from 'node:fs/promises';
@@ -9,7 +11,8 @@ import { ensureUserRoot, nextReportNumber, slug } from '../lib/user-root.js';
 import { DEFAULT_AGENTS_CONFIG, buildEvaluatorMessages, buildSummaryMessages, parseScoreSummary, collapseRepeats } from '../lib/prompts.js';
 import { runAgent } from '../lib/llm.js';
 import { extractJd } from '../lib/extract.js';
-import { setPipelineStatus } from '../lib/firestore.js';
+import { setPipelineStatus, addOpportunityForReport } from '../lib/firestore.js';
+import { run as runPdf } from './pdf.js';
 
 export async function run({ job, env, log, progress, cancelled }) {
   const { uid, payload } = job;
@@ -87,6 +90,17 @@ ${s.body}
   };
   await saveReport(uid, job.id, report);
   if (report.pipelineId) await setPipelineStatus(uid, report.pipelineId, { status: 'evaluated', reportJobId: job.id, score: s.score });
+  let auto = null;
+  if (payload.autoPipeline === true) {
+    auto = { opportunityId: null, pdf: null };
+    try { auto.opportunityId = await addOpportunityForReport(uid, job.id, report); await log(`auto-pipeline: pending card ${auto.opportunityId} on the Progress board`); }
+    catch (e) { await log(`auto-pipeline: could not add the board card — ${e.message}`); }
+    if (s.score != null && s.score >= 4.0) {
+      await progress('auto-pipeline: tailoring the CV');
+      try { auto.pdf = await runPdf({ job: { ...job, payload: { reportJobId: job.id } }, env, log, progress, cancelled }); }
+      catch (e) { if (e.message === 'cancelled') throw e; await log(`auto-pipeline: tailor failed — ${e.message}`); }
+    } else await log(`auto-pipeline: score ${s.score ?? '?'} < 4.0 — no CV tailored (career-ops: don't spend time below 4.0)`);
+  }
   await progress(`done — ${s.company} · ${s.score ?? '?'}/5`);
-  return { company: s.company, role: s.role, score: s.score, archetype: s.archetype, legitimacy: s.legitimacy, file: filename, via: out.via, durationMs: out.durationMs };
+  return { company: s.company, role: s.role, score: s.score, archetype: s.archetype, legitimacy: s.legitimacy, file: filename, via: out.via, durationMs: out.durationMs, ...(auto ? { auto } : {}) };
 }

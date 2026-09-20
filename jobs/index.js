@@ -11,6 +11,13 @@ import { run as exam } from './exam.js';
 import { run as finetune } from './finetune.js';
 import { run as importModel } from './import_model.js';
 import { run as promote } from './promote.js';
+import { run as deep } from './deep.js';
+import { run as advise } from './advise.js';
+import { run as contacto } from './contacto.js';
+import { run as apply } from './apply.js';
+import { run as interviewPrep } from './interview_prep.js';
+import { run as followup } from './followup.js';
+import { run as patterns } from './patterns.js';
 
 export const HANDLERS = {
   evaluate,
@@ -18,6 +25,14 @@ export const HANDLERS = {
   pdf,
   cover,
   sync_setup: syncSetup,
+  // CareerOps portal tasks
+  deep,
+  advise,
+  contacto,
+  apply,
+  interview_prep: interviewPrep,
+  followup,
+  patterns,
   import_model: importModel,
   build_dataset: buildDataset,
   generate_gold: generateGold,
