@@ -9,6 +9,8 @@ import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { accessToken } from '../lib/drive.js';
 import { saveModel, safeTag } from '../lib/training.js';
+import { existsSync } from 'node:fs';
+const OLLAMA_BIN = process.env.OLLAMA_BIN || ['/home/rafcasto/.local/bin/ollama', '/usr/local/bin/ollama', '/usr/bin/ollama'].find((p) => existsSync(p)) || 'ollama';
 
 export async function run({ job, env, log, progress }) {
   const { payload } = job;
@@ -27,7 +29,7 @@ export async function run({ job, env, log, progress }) {
     await pipeline(Readable.fromWeb(r.body), createWriteStream(gguf));
     await writeFile(join(local, 'Modelfile'), `FROM ./model.gguf\nPARAMETER temperature 0.2\nPARAMETER num_ctx 8192\nPARAMETER repeat_penalty 1.15\n`, 'utf8');
     await progress(`importing into Ollama as ${tag}`);
-    await new Promise((res, rej) => execFile('ollama', ['create', tag, '-f', 'Modelfile'], { cwd: local, timeout: 30 * 60 * 1000 }, (e, so, se) => (e ? rej(new Error(`ollama create failed: ${(se || so || e.message).trim().slice(-300)}`)) : res())));
+    await new Promise((res, rej) => execFile(OLLAMA_BIN, ['create', tag, '-f', 'Modelfile'], { cwd: local, timeout: 30 * 60 * 1000 }, (e, so, se) => (e ? rej(new Error(`ollama create failed: ${(se || so || e.message).trim().slice(-300)}`)) : res())));
     await saveModel(tag, { status: 'ready', ggufPath: gguf, importedAt: Date.now(), endedAt: Date.now() });
     await log(`ready: ${tag} imported from Drive`);
     return { tag };

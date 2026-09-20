@@ -112,8 +112,19 @@ async function runJob(id) {
 }
 
 // ---------------- main loop ----------------
+async function reapZombies() {
+  try {
+    const ids = await redis.zrange(KEYS.jobs, 0, 49, { rev: true });
+    for (const id of ids) {
+      const j = await redis.hgetall(KEYS.job(id));
+      if (j && j.status === 'running') { await patchJob(id, { status: 'failed', endedAt: now(), error: `worker restarted while this job was running (was ${j.worker ?? '?'})` }); say('reaped zombie job', id); }
+    }
+  } catch (e) { say('zombie reap failed', e.message); }
+}
+
 async function main() {
   say(`careerops-worker v${VERSION} as ${WORKER_ID} · repo ${env.repo} · data ${env.dataBase}`);
+  await reapZombies();
   try { await publishAgentDefaults(DEFAULT_AGENTS_CONFIG); await getAgentsConfig(DEFAULT_AGENTS_CONFIG); say('config/agents ready'); } catch (e) { say('config/agents unavailable:', e.message); }
   await publishState(); await heartbeat();
   let lastBeat = now(), lastState = now();

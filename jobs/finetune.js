@@ -4,6 +4,8 @@ import { execFile, spawn } from 'node:child_process';
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getDataset, saveModel, safeTag } from '../lib/training.js';
+import { existsSync } from 'node:fs';
+const OLLAMA_BIN = process.env.OLLAMA_BIN || ['/home/rafcasto/.local/bin/ollama', '/usr/local/bin/ollama', '/usr/bin/ollama'].find((p) => existsSync(p)) || 'ollama';
 
 const BASES = ['unsloth/Qwen2.5-1.5B-Instruct', 'unsloth/Llama-3.2-3B-Instruct', 'unsloth/Qwen2.5-3B-Instruct', 'unsloth/Llama-3.2-1B-Instruct'];
 
@@ -102,7 +104,7 @@ echo $? > .exit
     await writeFile(join(local, 'Modelfile'), `FROM ./${gguf}\nPARAMETER temperature 0.2\nPARAMETER num_ctx 8192\nPARAMETER repeat_penalty 1.15\n`, 'utf8');
 
     await progress(`importing into Ollama as ${tag}`);
-    await sh('ollama', ['create', tag, '-f', join(local, 'Modelfile')], { cwd: local, log });
+    await sh(OLLAMA_BIN, ['create', tag, '-f', join(local, 'Modelfile')], { cwd: local, log });
     await saveModel(tag, { status: 'ready', ggufPath: join(local, gguf), trainedAt: Date.now(), endedAt: Date.now() });
     await log(`ready: ${tag} ← ${base} on ${datasetName} (${ds.train} examples, ${epochs} epochs)`);
     await progress(`done — ${tag} is on the Pi`);

@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 WorkingDirectory=%h/careerops-worker
 EnvironmentFile=-%h/careerops-worker/.env
-Environment=PATH=%h/.nvm/versions/node/v24.21.0/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PATH=%h/.nvm/versions/node/v24.21.0/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=%h/.nvm/versions/node/v24.21.0/bin/node worker.js
 Restart=always
 RestartSec=10
