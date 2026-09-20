@@ -1,8 +1,17 @@
 # careerops-worker
 
 Raspberry Pi worker behind the **JHG Compass → CareerOps portal**. Polls the `JHG-Compass`
-Upstash Redis queue and runs the career-ops agents through n8n + Ollama (and Claude with
-web search for the Researcher when `ANTHROPIC_API_KEY` is set). Design and phases:
+Upstash Redis queue and runs the career-ops agents through n8n + Ollama. The Researcher
+(deep, contacto) gets web search from Claude when the Pi has either an `ANTHROPIC_API_KEY`
+**or a logged-in Claude Code CLI** (no key — your subscription):
+
+```bash
+curl -fsSL https://claude.ai/install.sh | bash   # installs ~/.local/bin/claude
+claude login                                     # once, as the user the service runs as
+systemctl --user restart careerops-worker        # Admin → CareerOps → Overview shows "Claude: cli"
+```
+
+Design and phases:
 `jhg-compass/docs/CAREER_OPS_AGENTS.md`.
 
 ```bash

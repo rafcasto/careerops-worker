@@ -6,7 +6,8 @@
 //             cvSource: 'synthetic' | 'setup', fitMix?: 'balanced' }
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { claudeConfigured, teach, TEACHER_MODEL } from '../lib/claude.js';
+import { claudeConfigured, teach as teachApi, TEACHER_MODEL } from '../lib/claude.js';
+import { claudeCliAvailable, teachViaCli } from '../lib/claude-cli.js';
 import { getSetup, getAgentsConfig } from '../lib/firestore.js';
 import { DEFAULT_AGENTS_CONFIG, buildEvaluatorMessages, parseScoreSummary, parseJsonObject } from '../lib/prompts.js';
 import { saveExample, exampleId, EXAM_SHARE } from '../lib/training.js';
@@ -29,7 +30,11 @@ JSON shape:
 const FITS = ['strong', 'good', 'borderline', 'poor', 'good', 'borderline'];
 
 export async function run({ job, env, log, progress, cancelled }) {
-  if (!claudeConfigured()) throw new Error('ANTHROPIC_API_KEY is not set on the Pi — add it to careerops-worker/.env');
+  // Teacher: the API when there is a key, otherwise a logged-in Claude Code CLI (`claude login`).
+  const useApi = claudeConfigured();
+  if (!useApi && !(await claudeCliAvailable())) throw new Error('No Claude on the Pi — set ANTHROPIC_API_KEY in careerops-worker/.env, or install Claude Code and run `claude login`');
+  const teach = useApi ? teachApi : teachViaCli;
+  await log(`teacher: ${useApi ? `Anthropic API (${TEACHER_MODEL})` : 'Claude Code CLI (subscription)'}`);
   const { payload } = job;
   const agent = payload.agent === 'evaluator' ? 'evaluator' : null;
   if (!agent) throw new Error('only the evaluator agent can be trained in this version');

@@ -1,8 +1,9 @@
 // deep — the Researcher: actionable intelligence on one company (modes/deep.md).
 //   payload { company, website?, reportJobId? }
-// Claude + web search when ANTHROPIC_API_KEY is on the Pi; otherwise the local model
-// works from the JD/report and the company's public page, and says what it couldn't verify.
-import { claudeConfigured, research, TEACHER_MODEL } from '../lib/claude.js';
+// Claude + web search when the Pi has an Anthropic key OR a logged-in Claude Code CLI
+// (lib/researcher.js); otherwise the local model works from the JD/report and the
+// company's public page, and says what it couldn't verify.
+import { researchWithClaude, researcherMode } from '../lib/researcher.js';
 import { htmlToText } from '../lib/extract.js';
 import { RESEARCHER_SYSTEM_PROMPT, buildTaskMessages } from '../lib/prompts.js';
 import { loadContext, runTask, finish, str } from './_task.js';
@@ -26,14 +27,15 @@ export async function run({ job, env, log, progress, cancelled }) {
   const system = cfg.systemPrompt || RESEARCHER_SYSTEM_PROMPT;
   const instruction = `Research **${company}**${role ? ` for the role **${role}**` : ''}${website ? ` (website: ${website})` : ''}. Produce the six sections.`;
 
-  let out, sources = null;
-  if (claudeConfigured()) {
-    await progress(`researching ${company} with Claude + web search`);
+  let out = null, sources = null;
+  const mode = await researcherMode();
+  if (mode !== 'local') {
+    await progress(`researching ${company} with Claude + web search (${mode})`);
     const [{ content: user }] = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, jd: report?.jd, report: report?.markdown, instruction, numCtx: 60000 }).slice(1);
-    const r = await research({ system, user, log });
-    out = { content: r.text, via: 'claude', model: r.servedBy || TEACHER_MODEL, durationMs: r.durationMs, usage: r.usage };
-    sources = r.sources;
-  } else {
+    out = await researchWithClaude({ system, user, log, cancelled });
+    sources = out?.sources ?? null;
+  }
+  if (!out) {
     await progress(`reading ${company}'s public page`);
     const page = website ? await fetchPage(website, log) : '';
     if (await cancelled()) return null;

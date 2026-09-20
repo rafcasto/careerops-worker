@@ -17,6 +17,7 @@ import { getAgentsConfig, publishAgentDefaults } from './lib/firestore.js';
 import { DEFAULT_AGENTS_CONFIG } from './lib/prompts.js';
 import { driveConfigured, driveAccountEmail, probeFolder } from './lib/drive.js';
 import { claudeConfigured, TEACHER_MODEL } from './lib/claude.js';
+import { claudeCliAvailable, claudeCliBin, CLI_MODEL } from './lib/claude-cli.js';
 import { firestore } from './lib/firestore.js';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -63,11 +64,19 @@ async function publishState() {
     models: models ?? [], agents, datasets: [],
     gpu: { host: env.gpuHost, reachable: gpu, checkedAt: now() },
     drive: { configured: driveConfigured(), account: driveAccountEmail(), folderId: process.env.GOOGLE_DRIVE_FOLDER_ID ?? null, ...(drive ?? {}) },
-    claude: { configured: claudeConfigured(), model: TEACHER_MODEL },
+    claude: await claudeState(),
     training: await trainingSummary(),
     careerOpsVersion: version, updatedAt: now(),
   };
   try { await redis.set(KEYS.state, JSON.stringify(state)); } catch (e) { say('state publish failed', e.message); }
+}
+
+// Which Claude the Researcher will use: api (key) · cli (`claude login`) · none.
+async function claudeState() {
+  if (claudeConfigured()) return { configured: true, via: 'api', model: TEACHER_MODEL };
+  const bin = await claudeCliBin();
+  if (bin && (await claudeCliAvailable())) return { configured: true, via: 'cli', model: CLI_MODEL || 'claude-code default', bin };
+  return { configured: false, via: 'none', model: TEACHER_MODEL, ...(bin ? { bin, hint: 'Claude Code found but not logged in — run `claude login` as this user' } : {}) };
 }
 
 async function trainingSummary() {

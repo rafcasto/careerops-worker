@@ -1,7 +1,7 @@
 // contacto — the Researcher as outreach helper (modes/contacto.md): the one person to
 // contact for a scored role + a DM under 300 characters in the persona framework.
 //   payload { reportJobId, target: hiring_manager|recruiter|peer|interviewer, personName?, personRole? }
-import { claudeConfigured, research, TEACHER_MODEL } from '../lib/claude.js';
+import { researchWithClaude, researcherMode } from '../lib/researcher.js';
 import { CONTACTO_SYSTEM_PROMPT, buildTaskMessages, parseDelimited } from '../lib/prompts.js';
 import { loadContext, runTask, finish, str } from './_task.js';
 
@@ -16,14 +16,14 @@ export async function run({ job, env, log, progress, cancelled }) {
   const known = personName || personRole ? `The candidate already has a target in mind: ${[personName, personRole].filter(Boolean).join(' — ')}. Write the message for them.` : '';
   const instruction = `Role: **${report.role}** at **${report.company}**${report.url ? ` (${report.url})` : ''}. Contact type: **${TARGETS[target]}**. ${known} Pick the target and draft the DM (under 300 characters).`;
 
-  let out, sources = null;
-  if (claudeConfigured() && !personName) {
+  let out = null, sources = null;
+  if (!personName && (await researcherMode()) !== 'local') {
     await progress(`finding the ${TARGETS[target].toLowerCase()} at ${report.company}`);
     const [{ content: user }] = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, jd: report.jd, report: report.markdown, instruction: instruction + ' Use at most three web searches; stop at the first confirmed person.', numCtx: 60000 }).slice(1);
-    const r = await research({ system, user, log, maxSearches: 3, maxTokens: 3000 });
-    out = { content: r.text, via: 'claude', model: r.servedBy || TEACHER_MODEL, durationMs: r.durationMs, usage: r.usage };
-    sources = r.sources;
-  } else {
+    out = await researchWithClaude({ system, user, log, cancelled, maxSearches: 3, maxTokens: 3000 });
+    sources = out?.sources ?? null;
+  }
+  if (!out) {
     await progress(`drafting with ${cfg.model}`);
     const messages = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, jd: report.jd, report: report.markdown, instruction: instruction + (personName ? '' : ' You have no web access: do not name anyone — describe the exact title to search for on LinkedIn.'), numCtx: cfg.numCtx });
     out = await runTask({ env, agent: 'researcher', cfg, system, messages, log, progress, cancelled, numPredict: 900 });
