@@ -52,3 +52,20 @@ test('claude-cli model tags are recognised and the pinned model is extracted', a
   const { researcherMode } = await import('../lib/researcher.js');
   assert.equal(await researcherMode({ model: 'qwen2.5:1.5b' }), 'local');
 });
+
+test('scan title filter follows career-ops semantics (substring positive, word: negative)', async () => {
+  const { titleMatches } = await import('../jobs/scan.js');
+  const f = { positive: ['Test Lead', 'QA Manager'], negative: ['Junior', 'word:Intern'] };
+  assert.equal(titleMatches('Senior Test Lead — Payments', f), true);
+  assert.equal(titleMatches('Junior QA Manager', f), false);
+  assert.equal(titleMatches('QA Manager (Internal Systems)', f), true);   // "Intern" only as a whole word
+  assert.equal(titleMatches('QA Manager Intern', f), false);
+  assert.equal(titleMatches('Product Owner', f), false);
+  assert.equal(titleMatches('Anything', { positive: [], negative: [] }), true);
+});
+
+test('classifyCompanies tells job boards from plain careers pages', async () => {
+  const { classifyCompanies } = await import('../jobs/scan.js');
+  const out = await classifyCompanies('/home/rafcasto/career-ops', [{ name: 'Xero', careersUrl: 'https://jobs.lever.co/xero' }, { name: 'ASB', careersUrl: 'https://careers.asbgroup.co.nz/home' }]);
+  assert.deepEqual(out.map((c) => [c.name, c.method, c.provider]), [['Xero', 'board', 'lever'], ['ASB', 'page', null]]);
+});
