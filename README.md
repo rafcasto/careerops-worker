@@ -44,6 +44,12 @@ Notes land in `users/{uid}/careerOpsNotes/{jobId}`. Task prompts live in `lib/pr
 the model per agent is chosen in Admin → CareerOps → Models. n8n agent workflows must be
 named `careerops/<agent>` (`careerops/evaluator`, …) so the worker can report which are active.
 
+Portal accounts (vault) can also be added from the Pi when the site is unavailable:
+
+```bash
+node scripts/vault-add.mjs rafael@example.com westpacnz.wd105.myworkdayjobs.com you+westpac@example.com   # prompts for the password
+```
+
 ```bash
 npm run check   # syntax
 npm test        # unit tests (patterns stats, prompt builders, job registry)
