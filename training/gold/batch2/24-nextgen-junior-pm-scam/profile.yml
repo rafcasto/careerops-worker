@@ -1,0 +1,17 @@
+candidate:
+  full_name: "Liam Foster"
+  email: "liam.foster@example.com"
+  location: "Christchurch, New Zealand"
+target_roles:
+  primary:
+    - "Associate Product Manager"
+    - "Product Analyst"
+    - "Graduate Business Analyst"
+compensation:
+  target_range: "NZ$60,000–75,000"
+  minimum: "NZ$55,000"
+location:
+  country: "New Zealand"
+  city: "Christchurch"
+  authorized_in:
+    - "New Zealand"

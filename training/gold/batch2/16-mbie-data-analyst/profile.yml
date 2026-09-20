@@ -1,0 +1,18 @@
+candidate:
+  full_name: "Mei Lin"
+  email: "mei.lin@example.com"
+  location: "Wellington, New Zealand"
+target_roles:
+  primary:
+    - "Senior Data Analyst"
+    - "Analytics Lead"
+compensation:
+  target_range: "NZ$115,000–130,000"
+  minimum: "NZ$105,000"
+location:
+  country: "New Zealand"
+  city: "Wellington"
+  visa_status: "Permanent resident"
+  needs_sponsorship: false
+  authorized_in:
+    - "New Zealand"

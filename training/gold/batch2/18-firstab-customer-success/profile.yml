@@ -1,0 +1,16 @@
+candidate:
+  full_name: "Jordan Reid"
+  email: "jordan.reid@example.com"
+  location: "Auckland, New Zealand"
+target_roles:
+  primary:
+    - "Customer Success Manager"
+    - "Support Manager"
+compensation:
+  target_range: "NZ$95,000–110,000"
+  minimum: "NZ$85,000"
+location:
+  country: "New Zealand"
+  city: "Auckland"
+  authorized_in:
+    - "New Zealand"

@@ -1,0 +1,16 @@
+candidate:
+  full_name: "Rewi Parata"
+  email: "rewi.parata@example.com"
+  location: "Wellington, New Zealand"
+target_roles:
+  primary:
+    - "Senior Business Analyst"
+    - "Lead Business Analyst (payments)"
+compensation:
+  target_range: "NZ$145,000–165,000"
+  minimum: "NZ$135,000"
+location:
+  country: "New Zealand"
+  city: "Wellington"
+  authorized_in:
+    - "New Zealand"

@@ -1,0 +1,16 @@
+candidate:
+  full_name: "Hemi Waititi"
+  email: "hemi.waititi@example.com"
+  location: "Wellington, New Zealand"
+target_roles:
+  primary:
+    - "Senior Project Manager (digital)"
+    - "Programme Manager"
+compensation:
+  target_range: "NZ$140,000–160,000"
+  minimum: "NZ$130,000"
+location:
+  country: "New Zealand"
+  city: "Wellington"
+  authorized_in:
+    - "New Zealand"

@@ -1,0 +1,16 @@
+candidate:
+  full_name: "Olivia Chen"
+  email: "olivia.chen@example.com"
+  location: "Auckland, New Zealand"
+target_roles:
+  primary:
+    - "Delivery Manager"
+    - "Senior Delivery Lead"
+compensation:
+  target_range: "NZ$135,000–150,000"
+  minimum: "NZ$125,000"
+location:
+  country: "New Zealand"
+  city: "Auckland"
+  authorized_in:
+    - "New Zealand"
