@@ -15,6 +15,7 @@ import { run as deep } from './deep.js';
 import { run as advise } from './advise.js';
 import { run as contacto } from './contacto.js';
 import { run as apply } from './apply.js';
+import { run as applyForm } from './apply_form.js';
 import { run as interviewPrep } from './interview_prep.js';
 import { run as followup } from './followup.js';
 import { run as patterns } from './patterns.js';
@@ -30,6 +31,7 @@ export const HANDLERS = {
   advise,
   contacto,
   apply,
+  apply_form: applyForm,
   interview_prep: interviewPrep,
   followup,
   patterns,

@@ -34,7 +34,8 @@ systemctl --user enable --now careerops-worker && journalctl --user -fu careerop
 | Scoring → training / project | `advise` | Evaluator | note `training` / `project` |
 | Tailoring → contacto | `contacto` | Researcher | note `contacto` (+ `data.dm`) |
 | Tailoring → pdf | `pdf` | Tailor | `careerOpsDocs` |
-| Tailoring → apply | `apply` (+ `pdf`, `cover`) | Writer | note `apply` (+ `data.answers[]`) |
+| Tailoring → apply | `apply` (+ `pdf`, `cover`) | Writer + answer bank | note `apply` (+ `data.answers[]`, reused / needs-you flags) |
+| Tailoring → apply → read the form | `apply_form` | script (browser) | note `apply_form` (+ `data.questions[]`, files, account gate) |
 | Tracking → interview-prep | `interview_prep` | Evaluator | note `interview_prep` |
 | Tracking → followup | `followup` | Writer | note `followup` (+ `data.body`) |
 | Tracking → patterns | `patterns` | Evaluator | note `patterns` (+ `data.stats`) |

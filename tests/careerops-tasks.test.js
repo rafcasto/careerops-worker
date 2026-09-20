@@ -144,3 +144,52 @@ test('ats-resolve finds the board behind a marketing careers page (links, then b
   assert.match(y, /careers_url: https:\/\/careers\.anz\.com\n\s+enabled: true\n\s+provider: successfactors\n\s+api: https:\/\/careers\.anz\.com/);
   assert.match(y, /positive:\n\s+- Test/);
 });
+
+test('answer bank: normalises questions, finds the standard family, reuses exact / standard / profile answers', async () => {
+  const { normalizeQuestion, standardKeyFor, matchAnswers, questionId } = await import('../lib/answers.js');
+  assert.equal(normalizeQuestion('3. Why do you want to work at Xero? *'), 'why do you want to work at xero');
+  assert.equal(normalizeQuestion('What are your salary expectations? (required)'), 'what are your salary expectations');
+  assert.equal(questionId('Why Xero?'), questionId('  why xero '));
+  assert.equal(standardKeyFor('Are you legally entitled to work in New Zealand?'), 'right_to_work');
+  assert.equal(standardKeyFor('What is your notice period?'), 'notice_period');
+  assert.equal(standardKeyFor('Do you require visa sponsorship?'), 'sponsorship');
+  assert.equal(standardKeyFor('Describe a time you influenced without authority.'), null);
+  const bank = [
+    { id: 'a', question: 'Why do you want to work at Xero?', key: 'why do you want to work at xero', answer: 'Because ledgers.', source: 'you', company: 'Xero', updatedAt: 2 },
+    { id: 's', question: 'Salary expectation', key: 'salary expectation', answer: '$150–170k', source: 'standard', standardKey: 'salary', updatedAt: 1 },
+  ];
+  const m = matchAnswers(['Why do you want to work at Xero?', 'What are your salary expectations?', 'Are you entitled to work in NZ?', 'Your LinkedIn profile URL', 'Tell us about a hard bug.'], bank, { linkedin: 'linkedin.com/in/raf' });
+  assert.deepEqual(m.map((x) => [x.standardKey, x.hit?.source ?? null, x.hit?.answer ?? null]), [
+    [null, 'you', 'Because ledgers.'], ['salary', 'standard', '$150–170k'], ['right_to_work', null, null], [null, 'profile', 'linkedin.com/in/raf'], [null, null, null],
+  ]);
+});
+
+test('form reader: collects fields from a real page and classifies questions / identity / files / account gate', async () => {
+  const { collectFieldsInPage, classifyFields } = await import('../lib/form-read.js');
+  const html = `<html><body><h1>Apply</h1><form>
+    <label for="fn">First name *</label><input id="fn" required>
+    <label for="em">Email</label><input id="em" type="email">
+    <label for="cv">Resume/CV</label><input id="cv" type="file" accept=".pdf">
+    <div class="field"><label for="q1">Why do you want to work at Xero?</label><textarea id="q1" maxlength="1000"></textarea></div>
+    <div class="field"><label for="q2">Are you legally entitled to work in New Zealand?</label><select id="q2"><option>Yes</option><option>No</option></select></div>
+    <fieldset><legend>Work arrangement</legend><label><input type="radio" name="wa" value="r">Remote</label><label><input type="radio" name="wa" value="h">Hybrid</label></fieldset>
+    <a href="/apply">Apply now</a></form></body></html>`;
+  const { pathToFileURL } = await import('node:url'); const { join } = await import('node:path');
+  const { chromium } = await import(pathToFileURL(join('/home/rafcasto/career-ops', 'node_modules', 'playwright', 'index.mjs')).href);
+  const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/chromium', args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'] });
+  try {
+    const page = await browser.newPage(); await page.setContent(html);
+    const collected = await page.evaluate(collectFieldsInPage);
+    const c = classifyFields(collected, 'https://jobs.example.com/x');
+    assert.deepEqual(c.identity.map((i) => i.label), ['First name', 'Email']);
+    assert.deepEqual(c.files.map((f) => [f.label, f.kind]), [['Resume/CV', 'cv']]);
+    assert.deepEqual(c.questions.map((q) => [q.label, q.type, q.options.length]), [['Why do you want to work at Xero?', 'textarea', 0], ['Are you legally entitled to work in New Zealand?', 'select', 2], ['Work arrangement', 'radio', 2]]);
+    assert.equal(c.questions[0].maxLength, 1000);
+    assert.equal(c.needsAccount, false);
+    assert.match(collected.applyHref, /\/apply$/);
+    const gate = classifyFields({ fields: [{ type: 'email', label: 'Email' }, { type: 'password', label: 'Password' }], password: true, text: 'Sign in to apply', url: 'https://x.wd3.myworkdayjobs.com/a' }, '');
+    assert.equal(gate.needsAccount, true); assert.equal(gate.atsHint, 'Workday'); assert.match(gate.note, /account/);
+    const long = classifyFields({ fields: [{ type: 'text', label: 'What is the address from which you plan on working? If you would need to relocate, please type "relocating".' }, { type: 'text', label: 'Country' }], password: false, text: '', url: 'https://x' }, '');
+    assert.deepEqual([long.questions.length, long.identity.map((i) => i.label)], [1, ['Country']]);
+  } finally { await browser.close(); }
+});
