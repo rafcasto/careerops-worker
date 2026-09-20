@@ -193,3 +193,54 @@ test('form reader: collects fields from a real page and classifies questions / i
     assert.deepEqual([long.questions.length, long.identity.map((i) => i.label)], [1, ['Country']]);
   } finally { await browser.close(); }
 });
+
+test('vault: browser-side RSA-OAEP ciphertext round-trips through the Pi private key; key file is 0600', async () => {
+  const { ensureVaultKey, encryptSecret, decryptSecret, vaultHost } = await import('../lib/vault.js');
+  const { mkdtemp, stat } = await import('node:fs/promises'); const { join } = await import('node:path'); const { tmpdir } = await import('node:os');
+  const dir = await mkdtemp(join(tmpdir(), 'vault-'));
+  const k1 = ensureVaultKey(dir); const k2 = ensureVaultKey(dir);
+  assert.equal(k1.publicKeySpkiB64, k2.publicKeySpkiB64);                       // stable across restarts
+  assert.equal(((await stat(k1.file)).mode & 0o777), 0o600);
+  const enc = encryptSecret(k1.publicKeySpkiB64, 'Tr0ub4dor&3 — pässwörd');
+  assert.equal(decryptSecret(k1.privateKey, enc), 'Tr0ub4dor&3 — pässwörd');
+  assert.equal(vaultHost('https://westpacnz.wd105.myworkdayjobs.com/en-US/Westpac_Careers/job/x'), 'westpacnz.wd105.myworkdayjobs.com');
+});
+
+test('form-login: only Continue/Next-style buttons are ever pressed; facts map onto labels', async () => {
+  const { nextButtonAllowed, portalFor, factFor, pickOption } = await import('../lib/form-login.js');
+  for (const ok of ['Save and Continue', 'Continue', 'Next', 'next step']) assert.equal(nextButtonAllowed(ok), true, ok);
+  for (const no of ['Submit', 'Apply', 'Apply Now', 'Send application', 'Continue and submit', 'Finish', 'Cancel', 'Sign In']) assert.equal(nextButtonAllowed(no), false, no);
+  assert.equal(portalFor('https://westpacnz.wd105.myworkdayjobs.com/x'), 'workday');
+  assert.equal(portalFor('https://careers.anz.com/job/1'), 'generic');
+  const facts = { firstName: 'Rafael', lastName: 'Castro', email: 'r@x.nz', phone: '021', standard: { how_heard: 'Company careers page', right_to_work: 'Yes — NZ citizen' } };
+  assert.equal(factFor('First Name', facts), 'Rafael'); assert.equal(factFor('Email Address', facts), 'r@x.nz');
+  assert.equal(factFor('How did you hear about us?', facts), 'Company careers page');
+  assert.equal(factFor('Why do you want this role?', facts), null);
+  assert.equal(pickOption(['Select one', 'Yes', 'No'], 'Yes — NZ citizen'), 'Yes');
+  assert.equal(pickOption(['LinkedIn', 'Company careers page', 'Other'], 'company careers page'), 'Company careers page');
+});
+
+test('form-login: walks a two-page wizard, fills known required fields, reads the question, never presses Submit', async () => {
+  const { walkWizard } = await import('../lib/form-login.js');
+  const html = `<html><body><script>window.submitted=false;</script>
+    <div id="p1"><h1>My Information</h1><label for="fn">First Name *</label><input id="fn" required>
+      <label for="src">How did you hear about us? *</label><select id="src" required><option value="">Select one</option><option>LinkedIn</option><option>Company careers page</option></select>
+      <button type="button" onclick="if(!fn.value||!src.value){err.textContent='This field is required'}else{p1.style.display='none';p2.style.display='block'}">Save and Continue</button><p id="err"></p></div>
+    <div id="p2" style="display:none"><h1>Application Questions</h1><label for="q">Why do you want to work at Westpac?</label><textarea id="q"></textarea>
+      <button type="button" onclick="p2.style.display='none';p3.style.display='block'">Next</button></div>
+    <div id="p3" style="display:none"><h1>Review your application</h1><p>Review</p><button type="button" onclick="window.submitted=true">Submit</button></div>
+  </body></html>`;
+  const { pathToFileURL } = await import('node:url'); const { join } = await import('node:path');
+  const { chromium } = await import(pathToFileURL(join('/home/rafcasto/career-ops', 'node_modules', 'playwright', 'index.mjs')).href);
+  const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/chromium', args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'] });
+  try {
+    const page = await browser.newPage(); await page.setContent(html);
+    const w = await walkWizard(page, { facts: { firstName: 'Rafael', standard: { how_heard: 'Company careers page' } } });
+    assert.equal(w.stoppedAt, 'review');
+    assert.equal(w.pages.length, 3);
+    assert.deepEqual(w.pages[0].filled, ['First Name ← Rafael', 'How did you hear about us? ← Company careers page']);
+    // The filled standard question stays in the list — the apply step reuses the standard answer for it.
+    assert.deepEqual(w.questions.map((q) => q.label), ['How did you hear about us?', 'Why do you want to work at Westpac?']);
+    assert.equal(await page.evaluate(() => window.submitted), false);
+  } finally { await browser.close(); }
+});

@@ -19,6 +19,7 @@ import { driveConfigured, driveAccountEmail, probeFolder } from './lib/drive.js'
 import { claudeConfigured, TEACHER_MODEL } from './lib/claude.js';
 import { claudeCliAvailable, claudeCliBin, CLI_MODEL, CLAUDE_CLI_MODELS } from './lib/claude-cli.js';
 import { firestore } from './lib/firestore.js';
+import { ensureVaultKey } from './lib/vault.js';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -36,6 +37,10 @@ const env = {
   pollMs: Math.max(1000, Number(process.env.POLL_MS) || 3000),
   repoWorker: dirname(fileURLToPath(import.meta.url)),
 };
+// Portal-account vault: RSA keypair on this Pi; the public half is published so the browser can
+// encrypt portal passwords that only this worker can read (lib/vault.js).
+let vault = null;
+try { vault = ensureVaultKey(env.repoWorker); env.vault = { privateKey: vault.privateKey }; } catch (e) { console.error('vault key unavailable:', e.message); }
 // How this worker introduces itself in the admin tab. The Pi's OS hostname is
 // shared with other services, so both are overridable from .env.
 const WORKER_HOST = process.env.WORKER_HOST || os.hostname();
@@ -67,7 +72,7 @@ async function publishState() {
     claude: await claudeState(),
     claudeModels: await claudeModelOptions(),
     training: await trainingSummary(),
-    careerOpsVersion: version, updatedAt: now(),
+    careerOpsVersion: version, vaultPublicKey: vault?.publicKeySpkiB64 ?? null, updatedAt: now(),
   };
   try { await redis.set(KEYS.state, JSON.stringify(state)); } catch (e) { say('state publish failed', e.message); }
 }
