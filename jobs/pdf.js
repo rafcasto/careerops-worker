@@ -9,6 +9,7 @@ import { runAgent } from '../lib/llm.js';
 import { parseProfile, kebab } from '../lib/profile.js';
 import { buildCvHtml, renderPdf, writeJson } from '../lib/render.js';
 import { savePdf } from '../lib/storage.js';
+import { resolveReportJd } from '../lib/report-jd.js';
 
 const TEMPLATES = new Set(['cv-template.html', 'cv-template.modern.html', 'cv-template.compact.html', 'cv-template.executive.html', 'cv-template.leadership.html', 'cv-template.jake.html']);
 const str = (v) => (v == null ? '' : String(v).trim());
@@ -23,15 +24,15 @@ export async function run({ job, env, log, progress, cancelled }) {
   await progress('loading your CV, profile and the report');
   const [setup, config, report] = await Promise.all([getSetup(uid), getAgentsConfig(DEFAULT_AGENTS_CONFIG), getReport(uid, reportJobId)]);
   if (!report) throw new Error('report not found — evaluate the job first');
-  if (!report.jd) throw new Error('this report has no saved job description — re-run the evaluation');
   const cfg = { ...config.agents.tailor, ...(payload.model ? { model: String(payload.model) } : {}) };
   if (!cfg.enabled) throw new Error('The Tailor agent is switched off by the admin');
   const root = await ensureUserRoot(env, uid, setup);
+  const jd = await resolveReportJd({ env, uid, root, report, reportJobId, log });
   const prof = parseProfile(setup.profileYaml);
   await log(`tailoring for ${report.company} — ${report.role} · model ${cfg.model} · template ${template}`);
 
   await progress(`tailoring with ${cfg.model}`);
-  const messages = buildTailorMessages({ system: cfg.systemPrompt, cv: setup.cvMarkdown, profileYaml: setup.profileYaml ?? '', jd: report.jd, reportExcerpt: reportExcerpt(report.markdown ?? ''), numCtx: cfg.numCtx });
+  const messages = buildTailorMessages({ system: cfg.systemPrompt, cv: setup.cvMarkdown, profileYaml: setup.profileYaml ?? '', jd, reportExcerpt: reportExcerpt(report.markdown ?? ''), numCtx: cfg.numCtx });
   const out = await runAgent({ env, agent: 'tailor', cfg, messages, log, progress, cancelled, format: 'json' });
   if (await cancelled()) return null;
   const j = parseJsonObject(out.content);

@@ -76,3 +76,28 @@ test('cleanTitle strips Eightfold-style location and posted-date suffixes', asyn
   assert.equal(cleanTitle('Technology Graduate Programme 2027 (Auckland and Wellington) Auckland, Auckland, NZ + 1 more Posted 2 days ago'), 'Technology Graduate Programme 2027 (Auckland and Wellington)');
   assert.equal(cleanTitle('Platform Lead'), 'Platform Lead');
 });
+
+test('resolveReportJd recovers a pre-phase-3 report JD from disk and backfills it', async () => {
+  const { resolveReportJd, jdFileFor } = await import('../lib/report-jd.js');
+  const { mkdtemp, mkdir, writeFile } = await import('node:fs/promises');
+  const { join } = await import('node:path');
+  const { tmpdir } = await import('node:os');
+  const root = await mkdtemp(join(tmpdir(), 'careerops-jd-'));
+  await mkdir(join(root, 'jds'), { recursive: true });
+  const report = { n: 1, company: 'ASB Group', role: 'Analyst', url: null, jdChars: 500 };
+  assert.equal(jdFileFor(report), '001-asb-group.txt');
+  const text = 'Senior Analyst wanted. '.repeat(30);
+  await writeFile(join(root, 'jds', '001-asb-group.txt'), text, 'utf8');
+  const persisted = [];
+  const jd = await resolveReportJd({ env: {}, uid: 'u1', root, report, reportJobId: 'j1', persist: async (uid, id, patch) => persisted.push({ uid, id, patch }) });
+  assert.equal(jd, text.trim());
+  assert.equal(persisted.length, 1);
+  assert.equal(persisted[0].id, 'j1');
+  assert.equal(persisted[0].patch.jd, text.trim());
+  assert.equal(persisted[0].patch.jdRecoveredFrom, 'jds/001-asb-group.txt');
+  // A report that already carries its JD is returned as-is, nothing persisted.
+  const same = await resolveReportJd({ env: {}, uid: 'u1', root, report: { ...report, jd: 'inline JD' }, reportJobId: 'j1', persist: async () => persisted.push('no') });
+  assert.equal(same, 'inline JD'); assert.equal(persisted.length, 1);
+  // Nothing on disk, no URL → a clear error naming the company.
+  await assert.rejects(() => resolveReportJd({ env: {}, uid: 'u1', root, report: { n: 9, company: 'Nowhere', url: null }, reportJobId: 'j2', persist: async () => {} }), /re-run the evaluation for Nowhere/);
+});

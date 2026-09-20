@@ -9,6 +9,7 @@ import { runAgent } from '../lib/llm.js';
 import { parseProfile, kebab } from '../lib/profile.js';
 import { buildCoverHtml, renderPdf, writeJson } from '../lib/render.js';
 import { savePdf } from '../lib/storage.js';
+import { resolveReportJd } from '../lib/report-jd.js';
 
 const str = (v) => (v == null ? '' : String(v).trim());
 const arr = (v) => (Array.isArray(v) ? v : []);
@@ -22,14 +23,14 @@ export async function run({ job, env, log, progress, cancelled }) {
   await progress('loading your CV, profile and the report');
   const [setup, config, report] = await Promise.all([getSetup(uid), getAgentsConfig(DEFAULT_AGENTS_CONFIG), getReport(uid, reportJobId)]);
   if (!report) throw new Error('report not found — evaluate the job first');
-  if (!report.jd) throw new Error('this report has no saved job description — re-run the evaluation');
   const cfg = { ...config.agents.writer, ...(payload.model ? { model: String(payload.model) } : {}) };
   if (!cfg.enabled) throw new Error('The Writer agent is switched off by the admin');
   const root = await ensureUserRoot(env, uid, setup);
+  const jd = await resolveReportJd({ env, uid, root, report, reportJobId, log });
   const prof = parseProfile(setup.profileYaml);
 
   await progress(`drafting with ${cfg.model}`);
-  const messages = buildWriterMessages({ system: cfg.systemPrompt, cv: setup.cvMarkdown, profileYaml: setup.profileYaml ?? '', jd: report.jd, reportExcerpt: reportExcerpt(report.markdown ?? ''), angle, numCtx: cfg.numCtx });
+  const messages = buildWriterMessages({ system: cfg.systemPrompt, cv: setup.cvMarkdown, profileYaml: setup.profileYaml ?? '', jd, reportExcerpt: reportExcerpt(report.markdown ?? ''), angle, numCtx: cfg.numCtx });
   const out = await runAgent({ env, agent: 'writer', cfg, messages, log, progress, cancelled, format: 'json' });
   if (await cancelled()) return null;
   const j = parseJsonObject(out.content);
