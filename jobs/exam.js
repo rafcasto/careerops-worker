@@ -6,7 +6,10 @@ import { DEFAULT_AGENTS_CONFIG, buildEvaluatorMessages, parseScoreSummary, colla
 import { runAgent } from '../lib/llm.js';
 import { listExamples, saveModel, getModel } from '../lib/training.js';
 
-const archKey = (a) => String(a ?? '').toLowerCase().replace(/^other:\s*/, '').replace(/[^a-z]+/g, ' ').trim().split(' ').slice(0, 2).join(' ');
+// Archetype agreement: normalise both, then accept containment either way so
+// "Other: Business Analyst / Product Owner" agrees with "Other: Product Owner".
+const archNorm = (a) => String(a ?? '').toLowerCase().replace(/^other:\s*/, '').replace(/[^a-z]+/g, ' ').trim();
+const archMatch = (gold, got) => { const g = archNorm(gold), h = archNorm(got); return !!g && !!h && (g.includes(h) || h.includes(g)); };
 
 export async function run({ job, env, log, progress, cancelled }) {
   const { payload } = job;
@@ -34,9 +37,9 @@ export async function run({ job, env, log, progress, cancelled }) {
     const c = {
       id: ex.id, company: ex.company, role: ex.role, seconds: Math.round((Date.now() - c0) / 1000),
       gold: { score: gold.score, archetype: gold.archetype, legitimacy: gold.legitimacy },
-      got: { score: s.score, archetype: s.archetype, legitimacy: s.legitimacy, summaryFound: s.found, raw: s.raw },
+      got: { score: s.score, archetype: s.archetype, legitimacy: s.legitimacy, summaryFound: s.found, raw: s.raw, tail: out.content.slice(-1200), doneReason: out.doneReason ?? null, tokens: out.usage?.completion ?? null },
       scoreDiff: s.score != null && gold.score != null ? Math.round(Math.abs(s.score - gold.score) * 100) / 100 : null,
-      archetypeMatch: !!archKey(gold.archetype) && archKey(gold.archetype) === archKey(s.archetype),
+      archetypeMatch: archMatch(gold.archetype, s.archetype),
       legitimacyMatch: normalizeLegitimacy(gold.legitimacy) === normalizeLegitimacy(s.legitimacy),
     };
     cases.push(c);
