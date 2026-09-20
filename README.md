@@ -36,6 +36,7 @@ systemctl --user enable --now careerops-worker && journalctl --user -fu careerop
 | Tailoring → pdf | `pdf` | Tailor | `careerOpsDocs` |
 | Tailoring → apply | `apply` (+ `pdf`, `cover`) | Writer + answer bank | note `apply` (+ `data.answers[]`, reused / needs-you flags) |
 | Tailoring → apply → read the form | `apply_form` | script (browser) | note `apply_form` (+ `data.questions[]`, files, account gate) |
+| Tailoring → apply → fill it in the portal | `apply_fill` | script (browser, signed in) | note `apply_fill` — the application typed into the portal as a draft up to Review; never submitted |
 | Tracking → interview-prep | `interview_prep` | Evaluator | note `interview_prep` |
 | Tracking → followup | `followup` | Writer | note `followup` (+ `data.body`) |
 | Tracking → patterns | `patterns` | Evaluator | note `patterns` (+ `data.stats`) |

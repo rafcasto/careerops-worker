@@ -242,5 +242,12 @@ test('form-login: walks a two-page wizard, fills known required fields, reads th
     // The filled standard question stays in the list — the apply step reuses the standard answer for it.
     assert.deepEqual(w.questions.map((q) => q.label), ['How did you hear about us?', 'Why do you want to work at Westpac?']);
     assert.equal(await page.evaluate(() => window.submitted), false);
+    // 'fill' mode: the drafted answer lands in the tenant question, the radio gets ticked, still no Submit.
+    const html2 = html.replace('<label for="q">Why do you want to work at Westpac?</label><textarea id="q"></textarea>', '<label for="q">Why do you want to work at Westpac?</label><textarea id="q"></textarea><fieldset><legend>Are you entitled to work in New Zealand?</legend><label><input type="radio" name="rtw" value="y">Yes</label><label><input type="radio" name="rtw" value="n">No</label></fieldset>');
+    await page.setContent(html2);
+    const w2 = await walkWizard(page, { mode: 'fill', facts: { firstName: 'Rafael', standard: { how_heard: 'Company careers page', right_to_work: 'Yes — NZ citizen' } }, answers: [{ question: 'Why do you want to work at Westpac?', answer: 'Because payments.' }] });
+    assert.equal(w2.stoppedAt, 'review');
+    assert.deepEqual(w2.pages[1].filled, ['Why do you want to work at Westpac? ← Because payments.', 'Are you entitled to work in New Zealand? ← Yes']);
+    assert.equal(await page.evaluate(() => window.submitted), false);
   } finally { await browser.close(); }
 });
