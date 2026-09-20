@@ -2,7 +2,7 @@
 // teacher: score MAE, share within ±0.5, archetype + legitimacy agreement.
 //   payload { tag, agent: 'evaluator', limit (1–20) }
 import { getAgentsConfig } from '../lib/firestore.js';
-import { DEFAULT_AGENTS_CONFIG, buildEvaluatorMessages, parseScoreSummary, collapseRepeats, normalizeLegitimacy } from '../lib/prompts.js';
+import { DEFAULT_AGENTS_CONFIG, buildEvaluatorMessages, buildSummaryMessages, parseScoreSummary, collapseRepeats, normalizeLegitimacy } from '../lib/prompts.js';
 import { runAgent } from '../lib/llm.js';
 import { listExamples, saveModel, getModel } from '../lib/training.js';
 
@@ -32,18 +32,28 @@ export async function run({ job, env, log, progress, cancelled }) {
     let out;
     try { out = await runAgent({ env, agent: 'evaluator', cfg, messages, log: async () => {}, progress: async () => {}, cancelled }); }
     catch (e) { if (e.message === 'cancelled') throw e; cases.push({ id: ex.id, company: ex.company, error: e.message }); await log(`case ${i + 1}: failed — ${e.message}`); continue; }
-    const s = parseScoreSummary(collapseRepeats(out.content));
+    const cleaned = collapseRepeats(out.content);
+    let s = parseScoreSummary(cleaned);
+    let viaSummaryPass = false;
+    // Same fallback production uses (jobs/evaluate.js): a short second pass that extracts the block.
+    if (!s.found || s.score == null) {
+      try {
+        const sum = await runAgent({ env, agent: 'evaluator', cfg: { ...cfg, temperature: 0 }, messages: buildSummaryMessages(cleaned), log: async () => {}, progress: async () => {}, cancelled, optionOverrides: { num_predict: 160, num_ctx: 8192 } });
+        const s2 = parseScoreSummary(sum.content);
+        if (s2.found && s2.score != null) { s = { ...s2, found: true }; viaSummaryPass = true; }
+      } catch (e) { if (e.message === 'cancelled') throw e; }
+    }
     const gold = ex.summary ?? {};
     const c = {
       id: ex.id, company: ex.company, role: ex.role, seconds: Math.round((Date.now() - c0) / 1000),
       gold: { score: gold.score, archetype: gold.archetype, legitimacy: gold.legitimacy },
-      got: { score: s.score, archetype: s.archetype, legitimacy: s.legitimacy, summaryFound: s.found, raw: s.raw, tail: out.content.slice(-1200), doneReason: out.doneReason ?? null, tokens: out.usage?.completion ?? null },
+      got: { score: s.score, archetype: s.archetype, legitimacy: s.legitimacy, summaryFound: s.found, viaSummaryPass, raw: s.raw, tail: out.content.slice(-1200), doneReason: out.doneReason ?? null, tokens: out.usage?.completion ?? null },
       scoreDiff: s.score != null && gold.score != null ? Math.round(Math.abs(s.score - gold.score) * 100) / 100 : null,
       archetypeMatch: archMatch(gold.archetype, s.archetype),
       legitimacyMatch: normalizeLegitimacy(gold.legitimacy) === normalizeLegitimacy(s.legitimacy),
     };
     cases.push(c);
-    await log(`case ${i + 1}: ${ex.company} · gold ${gold.score} vs ${s.score ?? '?'} · archetype ${c.archetypeMatch ? '✓' : '✗'} · ${c.seconds}s`);
+    await log(`case ${i + 1}: ${ex.company} · gold ${gold.score} vs ${s.score ?? '?'}${viaSummaryPass ? ' (2nd pass)' : ''} · archetype ${c.archetypeMatch ? '✓' : '✗'} · ${c.seconds}s`);
   }
   const scored = cases.filter((c) => c.scoreDiff != null);
   const result = {
@@ -52,7 +62,8 @@ export async function run({ job, env, log, progress, cancelled }) {
     within05: scored.length ? Math.round((scored.filter((c) => c.scoreDiff <= 0.5).length / scored.length) * 100) : null,
     archetypeAgreement: cases.length ? Math.round((cases.filter((c) => c.archetypeMatch).length / cases.length) * 100) : null,
     legitimacyAgreement: cases.length ? Math.round((cases.filter((c) => c.legitimacyMatch).length / cases.length) * 100) : null,
-    summaryRate: cases.length ? Math.round((cases.filter((c) => c.got?.summaryFound).length / cases.length) * 100) : null,
+    summaryRate: cases.length ? Math.round((cases.filter((c) => c.got?.summaryFound && !c.got?.viaSummaryPass).length / cases.length) * 100) : null,
+    summaryPassRate: cases.length ? Math.round((cases.filter((c) => c.got?.viaSummaryPass).length / cases.length) * 100) : null,
     avgSeconds: cases.length ? Math.round(cases.reduce((a, c) => a + (c.seconds ?? 0), 0) / cases.length) : null,
     at: Date.now(), promptVersion: cfg.promptVersion, cases,
   };
