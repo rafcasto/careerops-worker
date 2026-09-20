@@ -37,3 +37,23 @@ format adherence. Plan: 100–200 gold cases (Claude API `generate_gold`, ~$0.50
 next fine-tune; prefer the 1.5B base on this GPU, or train 3B elsewhere and use Import.
 Infrastructure lessons baked into the job: Python 3.12 venv, detached training with polling,
 resumable GGUF fetch, exam parser tolerant of `**KEY:**`.
+
+## Round 2 (2026-09-20 evening) — batch 2 added, prompts v3, 4 held-out cases
+
+Dataset `evaluator-pilot-v2`: 20 train / 4 exam (Lightspeed 3.6 · Serko 4.2 · FirstAB 1.5 · Datacom 4.1).
+Prompts v3 remove the `e.g. 3.8` example value (small models copied it into SCORE — the
+previous pilot2 run answered 3.8 on all four cases). Exams now apply the same second-pass
+extraction production uses, and the parser accepts an unterminated `---SCORE_SUMMARY---`.
+
+| Model | Per case (gold → got) | MAE | ±0.5 | Block emitted directly | s/case |
+|---|---|---|---|---|---|
+| `llama3.2:3b` stock | 3.6→3.8 · 4.2→4.0 · **1.5→4.0** · 4.1→3.8 | 0.80 | 75% | 50% | 279 |
+| `qwen2.5:1.5b-instruct` stock | 3.6→4.3 · 4.2→4.5 · **1.5→4.3** · 4.1→4.5 | 1.05 | 50% | 75% | 125 |
+| `careerops-evaluator:pilot2-1.5b` (LoRA, 20 ex., 3 epochs) | 3.6→4.2 · 4.2→2.8 · **1.5→4.0** · 4.1→3.7 | 1.23 | 25% | 50% | 142 |
+
+Read: every model, stock or tuned, scores the clear **poor-fit** case (FirstAB, gold 1.5) as a
+4 — none of them can say "no" yet, and that is the single most valuable thing the Evaluator
+must learn. 20 examples did not teach it. Run-to-run variance at n=4 is larger than the
+differences between models (the same pilot2 model produced 4.0 / 3.8 / 4.2 on Lightspeed across
+three runs). Stop-rule status: not met; do not promote. Next: 100–200 cases with at least a
+third poor/borderline fits, 20 held out, 3B base on Colab.
