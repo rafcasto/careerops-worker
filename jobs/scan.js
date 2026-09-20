@@ -57,14 +57,18 @@ export function titleMatches(title, { positive = [], negative = [] } = {}) {
 }
 
 // Which companies career-ops can read through a board API (uses its own provider registry).
+// A company may pin `provider` (career-ops id) and/or `api` (board URL) from Setup → Advanced —
+// the same fields as portals.yml — for branded ATS domains detect() cannot recognise.
+// An unknown provider id is reported as `error` and the company falls back to the browser.
 export async function classifyCompanies(repo, companies, log) {
   let providers = null;
   try { const reg = await import(join(repo, 'providers', '_registry.mjs')); providers = await reg.loadProviders(join(repo, 'providers')); var resolve = reg.resolveProvider; } catch (e) { await log?.(`provider registry unavailable (${e.message}) — treating every company as a page`); }
   return companies.map((c) => {
-    if (!providers) return { ...c, method: 'page', provider: null };
-    let r = null; try { r = resolve({ name: c.name, careers_url: c.careersUrl, enabled: true }, providers); } catch {}
+    if (!providers) return { ...c, method: 'page', provider: null, error: null };
+    let r = null;
+    try { r = resolve({ name: c.name, careers_url: c.careersUrl, ...(c.provider ? { provider: c.provider } : {}), ...(c.api ? { api: c.api } : {}), enabled: true }, providers, { skipIds: ['local-parser'] }); } catch {}
     const id = r?.provider?.id ?? null;
-    return { ...c, method: id ? 'board' : 'page', provider: id };
+    return { ...c, method: id ? 'board' : 'page', provider: id, error: r?.error ? String(r.error).slice(0, 160) : null };
   });
 }
 
@@ -83,7 +87,8 @@ export async function run({ job, env, log, progress, cancelled }) {
   const setup = await getSetup(uid);
   const root = await ensureUserRoot(env, uid, setup);
   const portals = String(setup?.portalsYaml ?? '').trim();
-  const companies = (setup?.portals?.companies ?? []).filter((c) => c && c.enabled !== false && c.name?.trim() && /^https?:\/\//.test(String(c.careersUrl ?? '').trim())).map((c) => ({ name: c.name.trim(), careersUrl: c.careersUrl.trim() }));
+  const companies = (setup?.portals?.companies ?? []).filter((c) => c && c.enabled !== false && c.name?.trim() && /^https?:\/\//.test(String(c.careersUrl ?? '').trim()))
+    .map((c) => ({ name: c.name.trim(), careersUrl: c.careersUrl.trim(), provider: String(c.provider ?? '').trim().toLowerCase() || null, api: /^https?:\/\//.test(String(c.apiUrl ?? '').trim()) ? c.apiUrl.trim() : null }));
   if (!portals || companies.length === 0) throw new Error('No watchlist yet — add companies in CareerOps → Setup');
   await writeFile(join(root, 'portals.yml'), portals + '\n', 'utf8');
   const filter = { positive: setup?.portals?.positive ?? [], negative: setup?.portals?.negative ?? [] };
@@ -93,7 +98,8 @@ export async function run({ job, env, log, progress, cancelled }) {
 
   // ---- pass 1: career-ops scan.mjs (board APIs) ----
   const t0 = Date.now();
-  const status = new Map(classified.map((c) => [c.careersUrl, { name: c.name, careersUrl: c.careersUrl, method: c.method, provider: c.provider, found: 0, matched: 0, error: null }]));
+  const status = new Map(classified.map((c) => [c.careersUrl, { name: c.name, careersUrl: c.careersUrl, method: c.method, provider: c.provider, found: 0, matched: 0, error: c.error ?? null }]));
+  for (const c of classified) if (c.error) await log(`${c.name}: ${c.error} — reading the page in the browser instead`);
   let receipt = null, boardItems = [];
   if (boards.length) {
     await progress(`reading ${boards.length} job board${boards.length === 1 ? '' : 's'}`);

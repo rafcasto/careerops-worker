@@ -68,6 +68,14 @@ test('classifyCompanies tells job boards from plain careers pages', async () => 
   const { classifyCompanies } = await import('../jobs/scan.js');
   const out = await classifyCompanies('/home/rafcasto/career-ops', [{ name: 'Xero', careersUrl: 'https://jobs.lever.co/xero' }, { name: 'ASB', careersUrl: 'https://careers.asbgroup.co.nz/home' }]);
   assert.deepEqual(out.map((c) => [c.name, c.method, c.provider]), [['Xero', 'board', 'lever'], ['ASB', 'page', null]]);
+  // Setup → Advanced: an explicit provider (branded SuccessFactors host) is a board; an unknown id is reported and falls back to the page.
+  const adv = await classifyCompanies('/home/rafcasto/career-ops', [
+    { name: 'ANZ', careersUrl: 'https://careers.anz.com', provider: 'successfactors', api: 'https://careers.anz.com' },
+    { name: 'Kiwibank', careersUrl: 'https://www.kiwibank.co.nz/about-us/careers/', api: 'https://kiwibankpeople.csod.com/ux/ats/careersite/1/home?c=kiwibankpeople' },
+    { name: 'Nope', careersUrl: 'https://example.com/jobs', provider: 'not-a-provider' },
+  ]);
+  assert.deepEqual(adv.map((c) => [c.name, c.method, c.provider, !!c.error]), [['ANZ', 'board', 'successfactors', false], ['Kiwibank', 'board', 'csod', false], ['Nope', 'page', null, true]]);
+  assert.match(adv[2].error, /unknown provider/);
 });
 
 test('cleanTitle strips Eightfold-style location and posted-date suffixes', async () => {
