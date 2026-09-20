@@ -109,3 +109,38 @@ test('resolveReportJd recovers a pre-phase-3 report JD from disk and backfills i
   // Nothing on disk, no URL → a clear error naming the company.
   await assert.rejects(() => resolveReportJd({ env: {}, uid: 'u1', root, report: { n: 9, company: 'Nowhere', url: null }, reportJobId: 'j2', persist: async () => {} }), /re-run the evaluation for Nowhere/);
 });
+
+test('ats-resolve finds the board behind a marketing careers page (links, then branded fingerprint)', async () => {
+  const { extractAtsLinks, extractCareerHosts, fingerprintHtml, knownNoProvider, resolveCompany, loadCareerOpsTools } = await import('../lib/ats-resolve.js');
+  const westpac = '<a href="https://westpacnz.wd105.myworkdayjobs.com/Westpac_Careers">Search jobs</a> <a href="https://westpacnz.wd105.myworkdayjobs.com/en-US/Westpac_Careers/introduceYourself">Join</a> <a href="/privacy">x</a>';
+  assert.deepEqual(extractAtsLinks(westpac, 'https://www.westpac.co.nz/about-us/careers/'), ['https://westpacnz.wd105.myworkdayjobs.com/Westpac_Careers']);
+  const anz = '<a href="https://careers.anz.com/go/ANZ-Jobs-List/4739210/">See all jobs</a>';
+  assert.deepEqual(extractCareerHosts(anz, 'https://www.anz.co.nz/careers/'), ['https://careers.anz.com']);
+  assert.equal(fingerprintHtml('<script src="https://performancemanager.successfactors.eu/x.js">'), 'successfactors');
+  assert.equal(fingerprintHtml('<div class="ph-page">'), 'phenom');
+  assert.equal(fingerprintHtml('<p>hello</p>'), null);
+  assert.equal(knownNoProvider('powered by SnapHire'), 'SnapHire');
+
+  const { resolve } = await loadCareerOpsTools('/home/rafcasto/career-ops');
+  const probed = [];
+  const probe = async (entry, p) => { probed.push([p.id, entry.careers_url]); return { provider: p.id, status: 'live', jobCount: 20 }; };
+  const pages = {
+    'https://www.westpac.co.nz/about-us/careers/': { url: 'https://www.westpac.co.nz/about-us/careers/', html: westpac },
+    'https://www.anz.co.nz/careers/': { url: 'https://www.anz.co.nz/careers/', html: anz },
+    'https://careers.anz.com': { url: 'https://careers.anz.com/', html: '<link href="https://career2.successfactors.eu/a.css">' },
+    'https://careers.asbgroup.co.nz/home': { url: 'https://careers.asbgroup.co.nz/home', html: '<div>powered by snaphire</div>' },
+  };
+  const fetchPage = async (u) => { if (!pages[u]) throw new Error('404'); return pages[u]; };
+  const w = await resolveCompany({ name: 'Westpac', careersUrl: 'https://www.westpac.co.nz/about-us/careers/' }, { resolve, probe, fetchPage });
+  assert.deepEqual(w, { careersUrl: 'https://westpacnz.wd105.myworkdayjobs.com/Westpac_Careers', provider: 'workday', apiUrl: null, live: 20, via: 'link' });
+  const a = await resolveCompany({ name: 'ANZ', careersUrl: 'https://www.anz.co.nz/careers/' }, { resolve, probe, fetchPage });
+  assert.deepEqual(a, { careersUrl: 'https://careers.anz.com', provider: 'successfactors', apiUrl: 'https://careers.anz.com', live: 20, via: 'fingerprint' });
+  const asb = await resolveCompany({ name: 'ASB', careersUrl: 'https://careers.asbgroup.co.nz/home' }, { resolve, probe, fetchPage });
+  assert.deepEqual(asb, { hint: 'runs on SnapHire, which has no board API — read in the browser' });
+  assert.equal(await resolveCompany({ name: 'Gone', careersUrl: 'https://nowhere.example/' }, { resolve, probe, fetchPage }), null);
+
+  const { applyResolvedToPortalsYaml } = await import('../jobs/scan.js');
+  const y = applyResolvedToPortalsYaml('title_filter:\n  positive: ["Test"]\n  negative: []\ntracked_companies:\n  - name: "ANZ"\n    careers_url: "https://www.anz.co.nz/careers/"\n    enabled: true\n', [{ name: 'anz', suggested: a }]);
+  assert.match(y, /careers_url: https:\/\/careers\.anz\.com\n\s+enabled: true\n\s+provider: successfactors\n\s+api: https:\/\/careers\.anz\.com/);
+  assert.match(y, /positive:\n\s+- Test/);
+});
