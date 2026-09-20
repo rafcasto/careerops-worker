@@ -69,3 +69,10 @@ test('classifyCompanies tells job boards from plain careers pages', async () => 
   const out = await classifyCompanies('/home/rafcasto/career-ops', [{ name: 'Xero', careersUrl: 'https://jobs.lever.co/xero' }, { name: 'ASB', careersUrl: 'https://careers.asbgroup.co.nz/home' }]);
   assert.deepEqual(out.map((c) => [c.name, c.method, c.provider]), [['Xero', 'board', 'lever'], ['ASB', 'page', null]]);
 });
+
+test('cleanTitle strips Eightfold-style location and posted-date suffixes', async () => {
+  const { cleanTitle } = await import('../jobs/scan.js');
+  assert.equal(cleanTitle('Senior Systems Test Analyst Auckland, Auckland, NZ Posted 12 days ago'), 'Senior Systems Test Analyst');
+  assert.equal(cleanTitle('Technology Graduate Programme 2027 (Auckland and Wellington) Auckland, Auckland, NZ + 1 more Posted 2 days ago'), 'Technology Graduate Programme 2027 (Auckland and Wellington)');
+  assert.equal(cleanTitle('Platform Lead'), 'Platform Lead');
+});

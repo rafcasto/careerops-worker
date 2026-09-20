@@ -30,6 +30,19 @@ export function parsePending(md) {
   return items;
 }
 
+// Scraped link text often carries the board's location/date noise:
+// "Senior Systems Test Analyst Auckland, Auckland, NZ Posted 12 days ago" → "Senior Systems Test Analyst".
+// Only the last "City, Region, CC" tail is removed (city = one word — a two-word city loses its
+// first word, which is cosmetic); anything from "Posted …" on is dropped.
+export function cleanTitle(raw) {
+  let t = String(raw ?? '').replace(/\s+/g, ' ').trim();
+  t = t.replace(/\s+(Posted|Published|Closes|Closing)\s.*$/i, '').trim();
+  t = t.replace(/\s*\+\s*\d+\s+more\s*$/i, '').trim();
+  const m = t.match(/^(.*\S)\s+(\S+),\s*[^,]+,\s*[A-Z]{2,3}$/);
+  if (m && /^[A-Z]/.test(m[2])) t = m[1];
+  return t.slice(0, 160);
+}
+
 // career-ops title_filter semantics: positive = any case-insensitive substring (empty list
 // = everything passes); negative = substring, or whole word when prefixed "word:".
 export function titleMatches(title, { positive = [], negative = [] } = {}) {
@@ -110,9 +123,10 @@ export async function run({ job, env, log, progress, cancelled }) {
     try {
       const { jobs, ms } = await scrapeCompany(env, c, log);
       const matched = jobs.filter((x) => titleMatches(x.title, filter));
-      pageItems.push(...matched.map((x) => ({ id: idFor(x.url), url: x.url, company: c.name, title: String(x.title).trim().slice(0, 160), location: null })));
+      pageItems.push(...matched.map((x) => ({ id: idFor(x.url), url: x.url, company: c.name, title: cleanTitle(x.title), location: null })));
       if (st.method === 'board' && st.error) st.error = `board ${st.error} — read the page in the browser instead`;
-      Object.assign(st, { method: 'page', found: jobs.length, matched: matched.length, ms });
+      const unmatched = jobs.filter((x) => !titleMatches(x.title, filter)).map((x) => String(x.title).trim().replace(/\s+/g, ' ').slice(0, 90));
+      Object.assign(st, { method: 'page', found: jobs.length, matched: matched.length, ms, sample: unmatched.slice(0, 12) });
       if (!jobs.length) st.error = st.error ?? 'no job list found on that page';
     } catch (e) {
       st.method = 'none'; st.error = String(e.message).slice(0, 160);
