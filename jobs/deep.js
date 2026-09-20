@@ -28,11 +28,11 @@ export async function run({ job, env, log, progress, cancelled }) {
   const instruction = `Research **${company}**${role ? ` for the role **${role}**` : ''}${website ? ` (website: ${website})` : ''}. Produce the six sections.`;
 
   let out = null, sources = null;
-  const mode = await researcherMode();
+  const mode = await researcherMode(cfg);
   if (mode !== 'local') {
     await progress(`researching ${company} with Claude + web search (${mode})`);
     const [{ content: user }] = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, jd: report?.jd, report: report?.markdown, instruction, numCtx: 60000 }).slice(1);
-    out = await researchWithClaude({ system, user, log, cancelled });
+    out = await researchWithClaude({ cfg, system, user, log, cancelled });
     sources = out?.sources ?? null;
   }
   if (!out) {

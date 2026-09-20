@@ -42,3 +42,13 @@ test('every member job type has a handler and the six agents are named', () => {
   for (const t of MEMBER_JOB_TYPES) assert.equal(typeof HANDLERS[t], 'function', t);
   assert.deepEqual(AGENT_KEYS, ['scout', 'extractor', 'evaluator', 'tailor', 'writer', 'researcher']);
 });
+
+test('claude-cli model tags are recognised and the pinned model is extracted', async () => {
+  const { isClaudeCliTag, cliModelFromTag } = await import('../lib/claude-cli.js');
+  assert.equal(isClaudeCliTag('claude-cli'), true);
+  assert.equal(isClaudeCliTag('claude-cli:opus'), true);
+  assert.equal(isClaudeCliTag('llama3.2:3b'), false);
+  assert.equal(cliModelFromTag('claude-cli:sonnet'), 'sonnet');
+  const { researcherMode } = await import('../lib/researcher.js');
+  assert.equal(await researcherMode({ model: 'qwen2.5:1.5b' }), 'local');
+});

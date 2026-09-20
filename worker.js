@@ -17,7 +17,7 @@ import { getAgentsConfig, publishAgentDefaults } from './lib/firestore.js';
 import { DEFAULT_AGENTS_CONFIG } from './lib/prompts.js';
 import { driveConfigured, driveAccountEmail, probeFolder } from './lib/drive.js';
 import { claudeConfigured, TEACHER_MODEL } from './lib/claude.js';
-import { claudeCliAvailable, claudeCliBin, CLI_MODEL } from './lib/claude-cli.js';
+import { claudeCliAvailable, claudeCliBin, CLI_MODEL, CLAUDE_CLI_MODELS } from './lib/claude-cli.js';
 import { firestore } from './lib/firestore.js';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -65,6 +65,7 @@ async function publishState() {
     gpu: { host: env.gpuHost, reachable: gpu, checkedAt: now() },
     drive: { configured: driveConfigured(), account: driveAccountEmail(), folderId: process.env.GOOGLE_DRIVE_FOLDER_ID ?? null, ...(drive ?? {}) },
     claude: await claudeState(),
+    claudeModels: await claudeModelOptions(),
     training: await trainingSummary(),
     careerOpsVersion: version, updatedAt: now(),
   };
@@ -77,6 +78,15 @@ async function claudeState() {
   const bin = await claudeCliBin();
   if (bin && (await claudeCliAvailable())) return { configured: true, via: 'cli', model: CLI_MODEL || 'claude-code default', bin };
   return { configured: false, via: 'none', model: TEACHER_MODEL, ...(bin ? { bin, hint: 'Claude Code found but not logged in — run `claude login` as this user' } : {}) };
+}
+
+// Non-Ollama model tags the admin may assign to any LLM agent (Compass → Models dropdown).
+async function claudeModelOptions() {
+  const out = [];
+  if (await claudeCliAvailable()) out.push(...CLAUDE_CLI_MODELS.map((m) => ({ ...m, available: true })));
+  else if (await claudeCliBin()) out.push({ name: 'claude-cli', label: 'Claude Code · not logged in', family: 'claude', available: false });
+  if (claudeConfigured()) out.push({ name: 'claude-api', label: `Anthropic API · ${TEACHER_MODEL}`, family: 'claude', available: true });
+  return out;
 }
 
 async function trainingSummary() {

@@ -17,10 +17,10 @@ export async function run({ job, env, log, progress, cancelled }) {
   const instruction = `Role: **${report.role}** at **${report.company}**${report.url ? ` (${report.url})` : ''}. Contact type: **${TARGETS[target]}**. ${known} Pick the target and draft the DM (under 300 characters).`;
 
   let out = null, sources = null;
-  if (!personName && (await researcherMode()) !== 'local') {
+  if (!personName && (await researcherMode(cfg)) !== 'local') {
     await progress(`finding the ${TARGETS[target].toLowerCase()} at ${report.company}`);
     const [{ content: user }] = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, jd: report.jd, report: report.markdown, instruction: instruction + ' Use at most three web searches; stop at the first confirmed person.', numCtx: 60000 }).slice(1);
-    out = await researchWithClaude({ system, user, log, cancelled, maxSearches: 3, maxTokens: 3000 });
+    out = await researchWithClaude({ cfg, system, user, log, cancelled, maxSearches: 3, maxTokens: 3000 });
     sources = out?.sources ?? null;
   }
   if (!out) {
