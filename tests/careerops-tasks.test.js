@@ -232,6 +232,12 @@ test('form-login: only Continue/Next-style buttons are ever pressed; facts map o
   assert.equal(draftUrlFor('https://westpacnz.wd105.myworkdayjobs.com/en-US/Westpac_Careers/job/x', 'Workday'), 'https://westpacnz.wd105.myworkdayjobs.com/en-US/Westpac_Careers/userHome');
   assert.equal(pickOption(['Select one', 'Yes', 'No'], 'Yes — NZ citizen'), 'Yes');
   assert.equal(pickOption(['LinkedIn', 'Company careers page', 'Other'], 'company careers page'), 'Company careers page');
+  assert.equal(pickOption(['Please select an option...', 'I agree', 'I do not agree'], 'I declare that the information I have provided is true.'), 'I agree');
+  assert.equal(pickOption(['Yes', 'No'], 'I do not hold a formal financial services accreditation.'), 'No');
+  assert.equal(pickOption(['No experience', '1-2 years', '3-5 years', '5+ years'], 'Yes — about 6 years with Selenium and Playwright'), '5+ years');
+  assert.equal(pickOption(['Less than 1 year', '1-3 years', '3+ years'], '2 years'), '1-3 years');
+  assert.equal(pickOption(['No current entitlement', 'I am a New Zealand Citizen', 'I am a New Zealand Permanent Resident', 'I hold a work visa'], 'NZ citizen — no restrictions'), 'I am a New Zealand Citizen');
+  assert.equal(pickOption(['Yes', 'No'], 'It depends'), null);
 });
 
 test('form-login: walks a two-page wizard, fills known required fields, reads the question, never presses Submit', async () => {
