@@ -181,6 +181,11 @@ test('form reader: collects fields from a real page and classifies questions / i
     const page = await browser.newPage(); await page.setContent(html);
     const collected = await page.evaluate(collectFieldsInPage);
     const c = classifyFields(collected, 'https://jobs.example.com/x');
+    // react-select (searchable and read-only variants): the chosen value lives in a sibling of the input's container.
+    await page.setContent('<label for="c1">Country *</label><div class="react-select__control"><div class="react-select__value-container"><div class="react-select__single-value">New Zealand</div><div class="react-select__input-container"><input id="c1" role="combobox" aria-autocomplete="list" class="react-select__input" value=""></div></div></div>');
+    const sel = (await page.evaluate(collectFieldsInPage)).fields[0];
+    assert.equal(sel.combobox, true); assert.equal(sel.selected, 'New Zealand');
+    await page.setContent(html);
     assert.deepEqual(c.identity.map((i) => i.label), ['First name', 'Email']);
     assert.deepEqual(c.files.map((f) => [f.label, f.kind]), [['Resume/CV', 'cv']]);
     assert.deepEqual(c.questions.map((q) => [q.label, q.type, q.options.length]), [['Why do you want to work at Xero?', 'textarea', 0], ['Are you legally entitled to work in New Zealand?', 'select', 2], ['Work arrangement', 'radio', 2]]);
