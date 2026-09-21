@@ -19,7 +19,7 @@ async function factsFor(uid, setup) {
   const [firstName, ...rest] = prof.name.split(/\s+/); const lastName = rest.join(' ');
   const standard = {};
   for (const a of await listAnswers(uid)) if (a.source === 'standard' && a.standardKey && a.answer) standard[a.standardKey] = a.answer;
-  return { name: prof.name, firstName, lastName, email: prof.email, phone: prof.phone, linkedin: prof.linkedin, github: prof.github, portfolio: prof.portfolio, city: prof.location, country: prof.country, standard };
+  return { name: prof.name, firstName, lastName, email: prof.email, phone: prof.phone || standard.phone || '', linkedin: prof.linkedin, github: prof.github, portfolio: prof.portfolio, city: prof.location, region: prof.location, country: prof.country, address: standard.street_address || '', postcode: standard.postcode || '', standard };
 }
 
 export async function run({ job, env, log, progress, cancelled }) {
@@ -75,7 +75,7 @@ export async function run({ job, env, log, progress, cancelled }) {
   await saveNote(uid, job.id, {
     kind: 'apply_form', title: `Application form: ${report.company} — ${report.role} (${form.questions.length} question${form.questions.length === 1 ? '' : 's'})`,
     company: report.company, role: report.role, reportJobId, opportunityId: null, markdown: md,
-    data: { url, finalUrl: form.finalUrl, atsHint: form.atsHint, needsAccount: form.needsAccount, note: form.note, questions: form.questions, identity: form.identity, files: form.files, host: vaultHost(form.finalUrl || url), signedIn },
+    data: { url, finalUrl: form.finalUrl, draftUrl: form.draftUrl ?? form.finalUrl, atsHint: form.atsHint, needsAccount: form.needsAccount, note: form.note, questions: form.questions, identity: form.identity, files: form.files, host: vaultHost(form.finalUrl || url), signedIn },
     agent: 'extractor', model: 'browser', via: 'script', durationMs: Date.now() - t0, usage: null,
   });
   await log(`${form.questions.length} question(s), ${form.files.length} file slot(s), ${form.identity.length} identity field(s)${form.needsAccount ? ' · account gate' : ''} on ${form.finalUrl}`);

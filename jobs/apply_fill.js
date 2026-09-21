@@ -40,7 +40,7 @@ export async function run({ job, env, log, progress, cancelled }) {
   const prof = parseProfile(setup?.profileYaml);
   const [firstName, ...rest] = prof.name.split(/\s+/);
   const standard = {}; for (const a of await listAnswers(uid)) if (a.source === 'standard' && a.standardKey && a.answer) standard[a.standardKey] = a.answer;
-  const facts = { name: prof.name, firstName, lastName: rest.join(' '), email: prof.email, phone: prof.phone, linkedin: prof.linkedin, github: prof.github, portfolio: prof.portfolio, city: prof.location, country: prof.country, standard };
+  const facts = { name: prof.name, firstName, lastName: rest.join(' '), email: prof.email, phone: prof.phone || standard.phone || '', linkedin: prof.linkedin, github: prof.github, portfolio: prof.portfolio, city: prof.location, region: prof.location, country: prof.country, address: standard.street_address || '', postcode: standard.postcode || '', standard };
   const cvPath = payload.cvFile ? join(userRoot(env, uid), 'output', String(payload.cvFile).replace(/[^\w.-]/g, '')) : null;
 
   const { browser, page } = await openBrowser(env);
@@ -61,7 +61,7 @@ export async function run({ job, env, log, progress, cancelled }) {
   const outcome = walk.stoppedAt === 'review' ? `Filled up to the Review page — sign in to ${host}, check every answer, and press Submit yourself.` : walk.stoppedAt.startsWith('blocked') ? `Stopped on "${walk.pages.at(-1)?.title || 'a page'}" — ${walk.stoppedAt.slice(9)}. What was filled is saved as a draft; finish that page in the portal.` : `Stopped (${walk.stoppedAt}) after ${walk.pages.length} page(s); what was filled is saved as a draft in your account.`;
   const md = [`# Fill in the portal: ${report.company} — ${report.role}`, '', `**Where:** ${walk.finalUrl}`, `\n> ${outcome}`, `\n## Filled (${filled.length})`, ...filled.map((f) => `- ${f}`), skipped.length ? `\n## Left for you (${skipped.length})\n${skipped.map((s) => `- ${s}`).join('\n')}` : '', `\n## Pages\n${walk.pages.map((p, i) => `${i + 1}. ${p.title || p.url}`).join('\n')}`].join('\n');
   await saveNote(uid, job.id, { kind: 'apply_fill', title: `Filled in the portal: ${report.company} — ${report.role} (${filled.length} field${filled.length === 1 ? '' : 's'})`, company: report.company, role: report.role, reportJobId, opportunityId: null, markdown: md,
-    data: { url, finalUrl: walk.finalUrl, host, atsHint: probe.atsHint, possible: true, stoppedAt: walk.stoppedAt, outcome, filled, skipped, pages: walk.pages.map((p) => ({ title: p.title, url: p.url, filled: p.filled.length, skipped: p.skipped.length })) },
+    data: { url, finalUrl: walk.finalUrl, draftUrl: probe.draftUrl ?? walk.finalUrl, host, atsHint: probe.atsHint, possible: true, stoppedAt: walk.stoppedAt, outcome, filled, skipped, pages: walk.pages.map((p) => ({ title: p.title, url: p.url, filled: p.filled.length, skipped: p.skipped.length })) },
     agent: 'extractor', model: 'browser', via: 'script', durationMs: Date.now() - t0, usage: null });
   await progress(`done — ${filled.length} filled, ${skipped.length} left for you (${walk.stoppedAt})`);
   return { filled: filled.length, skipped: skipped.length, stoppedAt: walk.stoppedAt, finalUrl: walk.finalUrl, durationMs: Date.now() - t0 };
