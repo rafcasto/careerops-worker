@@ -219,6 +219,11 @@ test('form-login: only Continue/Next-style buttons are ever pressed; facts map o
   const { isPlaceholder, answerFor } = await import('../lib/form-login.js');
   assert.equal(isPlaceholder('[Add: your legal middle name, or enter N/A]'), true); assert.equal(isPlaceholder('Because payments.'), false);
   assert.equal(answerFor('Middle name', [{ question: 'Middle name', answer: '[Add: your legal middle name]' }]), null);
+  const { cleanAnswer, numberFrom } = await import('../lib/form-login.js');
+  assert.equal(cleanAnswer('I am currently contracting at Foodstuffs North Island. [Add: your actual notice period]'), 'I am currently contracting at Foodstuffs North Island.');
+  assert.equal(cleanAnswer('[Add: your Auckland postcode — my CV lists only the city]'), null);
+  assert.equal(cleanAnswer('Yes — CV attached.'), 'Yes — CV attached.');
+  assert.equal(numberFrom('$150–170k base'), 150000); assert.equal(numberFrom('85,000'), 85000); assert.equal(numberFrom('negotiable'), null);
   const { classifyFields, draftUrlFor } = await import('../lib/form-read.js');
   const id = classifyFields({ fields: [{ type: 'text', label: 'Legal first name' }, { type: 'text', label: 'Postal code' }, { type: 'tel', label: 'Mobile Phone' }, { type: 'text', label: 'Region / State' }, { type: 'switch', label: 'Privacy setting', required: false }, { type: 'text', label: 'Where did you hear about us?', combobox: true }], password: false, text: '', url: 'https://careers.asbgroup.co.nz/candidate/application/1-personal-details' }, '');
   assert.deepEqual(id.identity.map((i) => i.label), ['Legal first name', 'Postal code', 'Mobile Phone', 'Region / State']);
