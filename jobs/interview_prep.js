@@ -14,7 +14,7 @@ export async function run({ job, env, log, progress, cancelled }) {
   const deep = await latestNote(uid, 'deep', report.jobId) ?? await latestNote(uid, 'deep').then((n) => (n && n.company && report.company && n.company.toLowerCase() === report.company.toLowerCase() ? n : null));
   if (deep) await log(`using deep-dive from ${new Date(deep.createdAt).toISOString().slice(0, 10)}`);
   const messages = buildTaskMessages({
-    system: INTERVIEW_PREP_SYSTEM_PROMPT, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, jd: report.jd, report: report.markdown,
+    system: INTERVIEW_PREP_SYSTEM_PROMPT, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, profileMd: setup.profileMd ?? '', jd: report.jd, report: report.markdown,
     extra: [['COMPANY RESEARCH (deep-dive)', deep?.markdown ?? '', 5000], ['WHAT THE CANDIDATE KNOWS ABOUT THE INTERVIEW', str(job.payload.extra, 2000), 2000]],
     instruction: `Audience: **${AUDIENCES[audience]}**. Role: **${report.role}** at **${report.company}**. Write the prep document.`, numCtx: cfg.numCtx, cvShare: 0.35,
   });

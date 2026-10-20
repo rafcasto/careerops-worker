@@ -27,7 +27,7 @@ export async function run({ job, env, log, progress, cancelled }) {
     if (await cancelled()) break;
     const ex = exam[i];
     await progress(`case ${i + 1}/${exam.length} — ${ex.company} (${tag})`);
-    const messages = buildEvaluatorMessages({ system: cfg.systemPrompt, cv: ex.cv, profileYaml: ex.profileYaml ?? '', jd: ex.jd, url: null, numCtx: cfg.numCtx });
+    const messages = buildEvaluatorMessages({ system: cfg.systemPrompt, cv: ex.cv, profileYaml: ex.profileYaml ?? '', profileMd: ex.profileMd ?? '', jd: ex.jd, url: null, numCtx: cfg.numCtx });
     const c0 = Date.now();
     let out;
     try { out = await runAgent({ env, agent: 'evaluator', cfg, messages, log: async () => {}, progress: async () => {}, cancelled }); }

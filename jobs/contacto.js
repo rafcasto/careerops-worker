@@ -19,13 +19,13 @@ export async function run({ job, env, log, progress, cancelled }) {
   let out = null, sources = null;
   if (!personName && (await researcherMode(cfg)) !== 'local') {
     await progress(`finding the ${TARGETS[target].toLowerCase()} at ${report.company}`);
-    const [{ content: user }] = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, jd: report.jd, report: report.markdown, instruction: instruction + ' Use at most three web searches; stop at the first confirmed person.', numCtx: 60000 }).slice(1);
+    const [{ content: user }] = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, profileMd: setup.profileMd ?? '', jd: report.jd, report: report.markdown, instruction: instruction + ' Use at most three web searches; stop at the first confirmed person.', numCtx: 60000 }).slice(1);
     out = await researchWithClaude({ cfg, system, user, log, cancelled, maxSearches: 3, maxTokens: 3000 });
     sources = out?.sources ?? null;
   }
   if (!out) {
     await progress(`drafting with ${cfg.model}`);
-    const messages = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, jd: report.jd, report: report.markdown, instruction: instruction + (personName ? '' : ' You have no web access: do not name anyone — describe the exact title to search for on LinkedIn.'), numCtx: cfg.numCtx });
+    const messages = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, profileMd: setup.profileMd ?? '', jd: report.jd, report: report.markdown, instruction: instruction + (personName ? '' : ' You have no web access: do not name anyone — describe the exact title to search for on LinkedIn.'), numCtx: cfg.numCtx });
     out = await runTask({ env, agent: 'researcher', cfg, system, messages, log, progress, cancelled, numPredict: 900 });
   }
   if (await cancelled()) return null;

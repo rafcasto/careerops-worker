@@ -31,7 +31,7 @@ export async function run({ job, env, log, progress, cancelled }) {
   const mode = await researcherMode(cfg);
   if (mode !== 'local') {
     await progress(`researching ${company} with Claude + web search (${mode})`);
-    const [{ content: user }] = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, jd: report?.jd, report: report?.markdown, instruction, numCtx: 60000 }).slice(1);
+    const [{ content: user }] = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, profileMd: setup.profileMd ?? '', jd: report?.jd, report: report?.markdown, instruction, numCtx: 60000 }).slice(1);
     out = await researchWithClaude({ cfg, system, user, log, cancelled });
     sources = out?.sources ?? null;
   }
@@ -40,7 +40,7 @@ export async function run({ job, env, log, progress, cancelled }) {
     const page = website ? await fetchPage(website, log) : '';
     if (await cancelled()) return null;
     await progress(`researching with ${cfg.model} (no web search on this Pi)`);
-    const messages = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, jd: report?.jd, report: report?.markdown, extra: [['COMPANY PAGE (untrusted, fetched text)', page, 5000]], instruction: instruction + ' You have no web access: state clearly in section 1 what could not be verified.', numCtx: cfg.numCtx });
+    const messages = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, profileMd: setup.profileMd ?? '', jd: report?.jd, report: report?.markdown, extra: [['COMPANY PAGE (untrusted, fetched text)', page, 5000]], instruction: instruction + ' You have no web access: state clearly in section 1 what could not be verified.', numCtx: cfg.numCtx });
     out = await runTask({ env, agent: 'researcher', cfg, system, messages, log, progress, cancelled });
   }
   if (await cancelled()) return null;

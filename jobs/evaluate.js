@@ -37,7 +37,7 @@ export async function run({ job, env, log, progress, cancelled }) {
   if (await cancelled()) return null;
 
   await progress(`evaluating with ${cfg.model}`);
-  const messages = buildEvaluatorMessages({ system: cfg.systemPrompt, cv: setup.cvMarkdown, profileYaml: setup.profileYaml ?? '', jd, url, numCtx: cfg.numCtx });
+  const messages = buildEvaluatorMessages({ system: cfg.systemPrompt, cv: setup.cvMarkdown, profileYaml: setup.profileYaml ?? '', profileMd: setup.profileMd ?? '', jd, url, numCtx: cfg.numCtx });
   const out = await runAgent({ env, agent: 'evaluator', cfg, messages, log, progress, cancelled });
   if (await cancelled()) return null;
 
