@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import {
   PROFILE_MD_CAP,
   buildEvaluatorMessages,
@@ -161,4 +162,93 @@ test('a task turn with no CV at all still works (patterns passes cv: "")', () =>
   const [, user] = buildTaskMessages({ system, cv: '', profileYaml, profileMd: FILLED_MD, instruction: 'Analyse.', numCtx: 16384 });
   assert.match(user.content, /# CANDIDATE TARGETING/);
   assert.doesNotMatch(user.content, /# CANDIDATE CV/);
+});
+
+// ---- the prompts have to TELL the model what the block is ----
+//
+// Shipping the block without saying what it is would have been half a change:
+// several prompts enumerate their inputs and say "grounded ONLY in the CV and
+// profile", which actively excludes an unexplained section. And a prompt edit
+// only reaches members whose stored copy auto-upgrades, which happens solely
+// when promptVersion moves (lib/firestore.js).
+
+import {
+  APPLY_SYSTEM_PROMPT, CONTACTO_SYSTEM_PROMPT, DEFAULT_AGENTS_CONFIG,
+  EVALUATOR_SYSTEM_PROMPT, FOLLOWUP_SYSTEM_PROMPT, INTERVIEW_PREP_SYSTEM_PROMPT,
+  PATTERNS_SYSTEM_PROMPT, PROJECT_SYSTEM_PROMPT, RESEARCHER_SYSTEM_PROMPT,
+  TAILOR_SYSTEM_PROMPT, TRAINING_SYSTEM_PROMPT, WRITER_SYSTEM_PROMPT,
+} from '../lib/prompts.js';
+
+const RECEIVES_TARGETING = {
+  EVALUATOR: EVALUATOR_SYSTEM_PROMPT,
+  TAILOR: TAILOR_SYSTEM_PROMPT,
+  WRITER: WRITER_SYSTEM_PROMPT,
+  RESEARCHER: RESEARCHER_SYSTEM_PROMPT,
+  CONTACTO: CONTACTO_SYSTEM_PROMPT,
+  TRAINING: TRAINING_SYSTEM_PROMPT,
+  PROJECT: PROJECT_SYSTEM_PROMPT,
+  INTERVIEW_PREP: INTERVIEW_PREP_SYSTEM_PROMPT,
+};
+
+test('every prompt that receives the block is told what it is', () => {
+  for (const [name, prompt] of Object.entries(RECEIVES_TARGETING)) {
+    assert.match(prompt, /CANDIDATE TARGETING/, `${name} never mentions the block`);
+    assert.match(prompt, /modes\/_profile\.md/, `${name} does not say which file it is`);
+    assert.match(prompt, /NOT SET/, `${name} does not say an unanswered section is unknown`);
+  }
+});
+
+test('no prompt still says "ONLY ... CV and profile", which would exclude the block', () => {
+  const all = { ...RECEIVES_TARGETING, APPLY: APPLY_SYSTEM_PROMPT, FOLLOWUP: FOLLOWUP_SYSTEM_PROMPT };
+  for (const [name, prompt] of Object.entries(all)) {
+    assert.doesNotMatch(prompt, /ONLY (in )?the candidate's CV and profile/, `${name} still excludes targeting`);
+    assert.doesNotMatch(prompt, /ONLY the CV, profile, the card/, `${name} still excludes targeting`);
+  }
+});
+
+test('the patterns analyst is told the block is the targeting under test, but still needs numbers', () => {
+  assert.match(PATTERNS_SYSTEM_PROMPT, /CANDIDATE TARGETING/);
+  assert.match(PATTERNS_SYSTEM_PROMPT, /rest on a number from the statistics/);
+});
+
+test('promptVersion moved for every agent whose prompt changed', () => {
+  // Stored prompts upgrade only when the default version is HIGHER than the
+  // stored one. Editing a prompt without bumping this leaves every existing
+  // member on the old instructions for ever.
+  const { agents } = DEFAULT_AGENTS_CONFIG;
+  assert.equal(agents.evaluator.promptVersion, 4);
+  assert.equal(agents.tailor.promptVersion, 2);
+  assert.equal(agents.writer.promptVersion, 3);
+  assert.equal(agents.researcher.promptVersion, 2);
+  // Script agents have no prompt and must stay at 0.
+  assert.equal(agents.scout.promptVersion, 0);
+  assert.equal(agents.extractor.promptVersion, 0);
+});
+
+test('every versioned default prompt is non-empty and carries its own version', () => {
+  for (const k of ['evaluator', 'tailor', 'writer', 'researcher']) {
+    const a = DEFAULT_AGENTS_CONFIG.agents[k];
+    assert.ok(a.systemPrompt.length > 200, `${k} prompt looks empty`);
+    assert.ok(a.promptVersion >= 1, `${k} is versioned`);
+  }
+});
+
+test('contacto keeps its own prompt when the researcher default version moves', async () => {
+  // Regression: the old test was `cfg.promptVersion > 1`, compared against the
+  // shipped researcher default of 1. Bumping that default to 2 made the
+  // condition true for everyone and silently switched outreach onto the
+  // deep-dive prompt. promptEditedBy is the real signal.
+  const src = await readFile(new URL('../jobs/contacto.js', import.meta.url), 'utf8');
+  // Comments explain the old heuristic by name, so check the CODE only.
+  const code = src.replace(/^\s*\/\/.*$/gm, '');
+  assert.match(code, /cfg\.promptEditedBy && cfg\.systemPrompt \? cfg\.systemPrompt : CONTACTO_SYSTEM_PROMPT/);
+  assert.doesNotMatch(code, /cfg\.promptVersion > 1/, 'version-number heuristic is back');
+
+  // And the condition itself behaves: untouched → contacto's own prompt;
+  // edited by an admin → theirs.
+  const pick = (cfg) => (cfg.promptEditedBy && cfg.systemPrompt ? cfg.systemPrompt : CONTACTO_SYSTEM_PROMPT);
+  const researcherDefault = DEFAULT_AGENTS_CONFIG.agents.researcher;
+  assert.equal(pick(researcherDefault), CONTACTO_SYSTEM_PROMPT, 'a default install must not use the deep-dive prompt');
+  assert.equal(pick({ ...researcherDefault, promptVersion: 9 }), CONTACTO_SYSTEM_PROMPT, 'a version bump alone must not switch it');
+  assert.equal(pick({ systemPrompt: 'ADMIN EDIT', promptEditedBy: 'admin@example.com' }), 'ADMIN EDIT');
 });
