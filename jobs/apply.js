@@ -27,7 +27,7 @@ export async function run({ job, env, log, progress, cancelled }) {
   let drafted = new Map(); let out = { via: 'bank', model: 'answer bank', durationMs: 0, usage: null };
   if (toDraft.length) {
     const messages = buildTaskMessages({
-      system: APPLY_SYSTEM_PROMPT, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, jd: report.jd, report: report.markdown,
+      system: APPLY_SYSTEM_PROMPT, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, profileMd: setup.profileMd ?? '', jd: report.jd, report: report.markdown,
       extra: [['THE FORM QUESTIONS (one per line, answer every one, keep the wording verbatim)', toDraft.map((q, i) => `${i + 1}. ${q}`).join('\n'), 12000]],
       instruction: `Role: **${report.role}** at **${report.company}**. Return the JSON object with ${toDraft.length} answers.`, numCtx: cfg.numCtx, cvShare: 0.4,
     });

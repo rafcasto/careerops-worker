@@ -12,7 +12,7 @@ export async function run({ job, env, log, progress, cancelled }) {
   const { setup, cfg } = await loadContext({ job, env, agent: 'evaluator' });
   const system = kind === 'project' ? PROJECT_SYSTEM_PROMPT : TRAINING_SYSTEM_PROMPT;
   const facts = [`Name: ${title}`, job.payload.provider ? `${kind === 'project' ? 'Stack' : 'Provider'}: ${str(job.payload.provider, 160)}` : '', job.payload.url ? `Link: ${str(job.payload.url, 300)}` : '', job.payload.cost ? `Cost: ${str(job.payload.cost, 40)}` : '', job.payload.effort ? `Time: ${str(job.payload.effort, 60)}` : '', '', description].filter((l) => l !== undefined).join('\n');
-  const messages = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, extra: [[kind === 'project' ? 'THE PROJECT IDEA' : 'THE COURSE / CERTIFICATION', facts, 5000]], instruction: `Evaluate this ${kind} for the candidate and give the verdict.`, numCtx: cfg.numCtx, cvShare: 0.45 });
+  const messages = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, profileMd: setup.profileMd ?? '', extra: [[kind === 'project' ? 'THE PROJECT IDEA' : 'THE COURSE / CERTIFICATION', facts, 5000]], instruction: `Evaluate this ${kind} for the candidate and give the verdict.`, numCtx: cfg.numCtx, cvShare: 0.45 });
   await progress(`judging with ${cfg.model}`);
   const out = await runTask({ env, agent: 'evaluator', cfg, system, messages, log, progress, cancelled, numPredict: 1800 });
   if (await cancelled()) return null;

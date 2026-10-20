@@ -52,7 +52,7 @@ export async function run({ job, env, log, progress, cancelled }) {
   await log(`stats: ${stats.totals.reports} reports · ${stats.totals.rejected} rejected · ${stats.totals.positive} positive · decided ${stats.totals.decided}${stats.totals.sufficientSample ? '' : ' (small sample)'}`);
   if (await cancelled()) return null;
   const messages = buildTaskMessages({
-    system: PATTERNS_SYSTEM_PROMPT, cv: '', profileYaml: setup.profileYaml ?? '', extra: [['COMPUTED STATISTICS (JSON)', JSON.stringify(stats, null, 1), 14000]],
+    system: PATTERNS_SYSTEM_PROMPT, cv: '', profileYaml: setup.profileYaml ?? '', profileMd: setup.profileMd ?? '', extra: [['COMPUTED STATISTICS (JSON)', JSON.stringify(stats, null, 1), 14000]],
     instruction: 'Write the targeting analysis from these statistics only.', numCtx: cfg.numCtx,
   });
   await progress(`analysing with ${cfg.model}`);

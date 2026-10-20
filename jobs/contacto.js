@@ -12,20 +12,27 @@ export async function run({ job, env, log, progress, cancelled }) {
   const personName = str(job.payload.personName, 120), personRole = str(job.payload.personRole, 120);
   await progress('loading the report');
   const { setup, cfg, report } = await loadContext({ job, env, agent: 'researcher', reportJobId: str(job.payload.reportJobId, 40) });
-  const system = cfg.systemPrompt && cfg.promptVersion > 1 ? cfg.systemPrompt : CONTACTO_SYSTEM_PROMPT; // the admin prompt is the deep-dive one; contacto keeps its own unless edited past v1
+  // The researcher agent's stored prompt is the DEEP-DIVE one; contacto keeps
+  // its own unless an admin deliberately edited it. That used to be detected
+  // with `cfg.promptVersion > 1`, compared against the shipped default of 1 —
+  // so the moment that default was bumped, every member silently switched to
+  // the deep-dive prompt for outreach. promptEditedBy is the actual signal
+  // (lib/firestore.js sets the upgrade path from it) and does not move when a
+  // new default ships.
+  const system = cfg.promptEditedBy && cfg.systemPrompt ? cfg.systemPrompt : CONTACTO_SYSTEM_PROMPT;
   const known = personName || personRole ? `The candidate already has a target in mind: ${[personName, personRole].filter(Boolean).join(' — ')}. Write the message for them.` : '';
   const instruction = `Role: **${report.role}** at **${report.company}**${report.url ? ` (${report.url})` : ''}. Contact type: **${TARGETS[target]}**. ${known} Pick the target and draft the DM (under 300 characters).`;
 
   let out = null, sources = null;
   if (!personName && (await researcherMode(cfg)) !== 'local') {
     await progress(`finding the ${TARGETS[target].toLowerCase()} at ${report.company}`);
-    const [{ content: user }] = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, jd: report.jd, report: report.markdown, instruction: instruction + ' Use at most three web searches; stop at the first confirmed person.', numCtx: 60000 }).slice(1);
+    const [{ content: user }] = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, profileMd: setup.profileMd ?? '', jd: report.jd, report: report.markdown, instruction: instruction + ' Use at most three web searches; stop at the first confirmed person.', numCtx: 60000 }).slice(1);
     out = await researchWithClaude({ cfg, system, user, log, cancelled, maxSearches: 3, maxTokens: 3000 });
     sources = out?.sources ?? null;
   }
   if (!out) {
     await progress(`drafting with ${cfg.model}`);
-    const messages = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, jd: report.jd, report: report.markdown, instruction: instruction + (personName ? '' : ' You have no web access: do not name anyone — describe the exact title to search for on LinkedIn.'), numCtx: cfg.numCtx });
+    const messages = buildTaskMessages({ system, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, profileMd: setup.profileMd ?? '', jd: report.jd, report: report.markdown, instruction: instruction + (personName ? '' : ' You have no web access: do not name anyone — describe the exact title to search for on LinkedIn.'), numCtx: cfg.numCtx });
     out = await runTask({ env, agent: 'researcher', cfg, system, messages, log, progress, cancelled, numPredict: 900 });
   }
   if (await cancelled()) return null;

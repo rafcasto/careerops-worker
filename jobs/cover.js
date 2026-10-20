@@ -30,7 +30,7 @@ export async function run({ job, env, log, progress, cancelled }) {
   const prof = parseProfile(setup.profileYaml);
 
   await progress(`drafting with ${cfg.model}`);
-  const messages = buildWriterMessages({ system: cfg.systemPrompt, cv: setup.cvMarkdown, profileYaml: setup.profileYaml ?? '', jd, reportExcerpt: reportExcerpt(report.markdown ?? ''), angle, numCtx: cfg.numCtx });
+  const messages = buildWriterMessages({ system: cfg.systemPrompt, cv: setup.cvMarkdown, profileYaml: setup.profileYaml ?? '', profileMd: setup.profileMd ?? '', jd, reportExcerpt: reportExcerpt(report.markdown ?? ''), angle, numCtx: cfg.numCtx });
   const out = await runAgent({ env, agent: 'writer', cfg, messages, log, progress, cancelled, format: 'json' });
   if (await cancelled()) return null;
   const j = parseJsonObject(out.content);

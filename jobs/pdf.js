@@ -32,7 +32,7 @@ export async function run({ job, env, log, progress, cancelled }) {
   await log(`tailoring for ${report.company} — ${report.role} · model ${cfg.model} · template ${template}`);
 
   await progress(`tailoring with ${cfg.model}`);
-  const messages = buildTailorMessages({ system: cfg.systemPrompt, cv: setup.cvMarkdown, profileYaml: setup.profileYaml ?? '', jd, reportExcerpt: reportExcerpt(report.markdown ?? ''), numCtx: cfg.numCtx });
+  const messages = buildTailorMessages({ system: cfg.systemPrompt, cv: setup.cvMarkdown, profileYaml: setup.profileYaml ?? '', profileMd: setup.profileMd ?? '', jd, reportExcerpt: reportExcerpt(report.markdown ?? ''), numCtx: cfg.numCtx });
   const out = await runAgent({ env, agent: 'tailor', cfg, messages, log, progress, cancelled, format: 'json' });
   if (await cancelled()) return null;
   const j = parseJsonObject(out.content);

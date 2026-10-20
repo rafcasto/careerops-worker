@@ -12,7 +12,7 @@ export async function run({ job, env, log, progress, cancelled }) {
   const { setup, cfg, report } = await loadContext({ job, env, agent: 'writer', reportJobId: str(p.reportJobId, 40) });
   const card = [`Company: ${company}`, p.role ? `Role: ${str(p.role, 160)}` : '', `Stage on the board: ${str(p.stage, 60)}`, `Days since the last activity: ${days}`, p.lastNote ? `Last note on the card: ${str(p.lastNote, 600)}` : ''].filter(Boolean).join('\n');
   const messages = buildTaskMessages({
-    system: FOLLOWUP_SYSTEM_PROMPT, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, jd: report?.jd, report: report?.markdown,
+    system: FOLLOWUP_SYSTEM_PROMPT, cv: setup.cvMarkdown, profileYaml: setup.profileYaml, profileMd: setup.profileMd ?? '', jd: report?.jd, report: report?.markdown,
     extra: [['THE CARD', card, 1500]],
     instruction: `Channel: **${channel === 'email' ? 'email (under 120 words, with a subject)' : 'LinkedIn message (under 300 characters, no subject)'}**. Return the JSON object.`, numCtx: cfg.numCtx, cvShare: 0.4,
   });
